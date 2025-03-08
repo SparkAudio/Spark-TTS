@@ -29,14 +29,30 @@ from sparktts.models.bicodec import BiCodec
 class BiCodecTokenizer:
     """BiCodec tokenizer for handling audio input and tokenization."""
 
-    def __init__(self, model_dir: Path, device: torch.device = None, **kwargs):
+    def __init__(self, model_dir: Path, device = None, **kwargs):
         super().__init__()
         """
         Args:
             model_dir: Path to the model directory.
             device: Device to run the model on (default is GPU if available).
+                   Can be a string ('cpu', 'cuda:0') or torch.device object.
         """
-        self.device = device
+        # 处理设备参数
+        if device is None:
+            self.device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+        elif isinstance(device, str):
+            if device == 'cpu':
+                self.device = torch.device('cpu')
+            else:
+                try:
+                    device_id = int(device)
+                    self.device = torch.device(f"cuda:{device_id}")
+                except ValueError:
+                    # 如果无法转换为整数，假设是完整的设备字符串
+                    self.device = torch.device(device)
+        else:
+            self.device = device
+            
         self.model_dir = model_dir
         self.config = load_config(f"{model_dir}/config.yaml")
         self._initialize_model()

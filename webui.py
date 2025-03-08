@@ -26,8 +26,11 @@ from sparktts.utils.token_parser import LEVELS_MAP_UI
 
 def initialize_model(model_dir="pretrained_models/Spark-TTS-0.5B", device=0):
     """Load the model once at the beginning."""
+    # 如果设备为'cpu'或不是数字，则使用CPU
+    if device == 'cpu' or not isinstance(device, int):
+        device = 'cpu'
+    
     logging.info(f"Loading model from: {model_dir}")
-    device = torch.device(f"cuda:{device}")
     model = SparkTTS(model_dir, device)
     return model
 
@@ -214,18 +217,15 @@ def parse_arguments():
         "--model_dir",
         type=str,
         default="pretrained_models/Spark-TTS-0.5B",
-        help="Path to the model directory."
+        help="Spark-TTS model directory",
     )
     parser.add_argument(
-        "--device",
-        type=int,
-        default=0,
-        help="ID of the GPU device to use (e.g., 0 for cuda:0)."
+        "--device", type=str, default=0, help="Device to run the model on, use 'cpu' for CPU-only mode"
     )
     parser.add_argument(
         "--server_name",
         type=str,
-        default="0.0.0.0",
+        default="localhost",
         help="Server host/IP for Gradio app."
     )
     parser.add_argument(
@@ -234,7 +234,8 @@ def parse_arguments():
         default=7860,
         help="Server port for Gradio app."
     )
-    return parser.parse_args()
+    args = parser.parse_args()
+    return args
 
 if __name__ == "__main__":
     # Parse command-line arguments
