@@ -184,5 +184,7 @@ if __name__ == "__main__":
         inputs = [task, age, gender, mel, mel_level, loudness, loudness_level, emotion]
         inputs = "".join(inputs)
         ids = tokenizer.encode(inputs, add_special_tokens=False)
-        print(ids)
-        print("decode", tokenizer.decode(ids))
+        print("tokenized ids",ids)
+        tokens = tokenizer.decode(ids)
+        print("decoded tokens", tokens)
+        assert tokens == inputs
