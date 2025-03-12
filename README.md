@@ -60,6 +60,8 @@ Spark-TTS is an advanced text-to-speech system that uses the power of large lang
 
 - **[2025-03-04]** Our paper on this project has been published! You can read it here: [Spark-TTS](https://arxiv.org/pdf/2503.01710). 
 
+- **[2025-03-12]** Nvidia Triton Inference Serving is now supported. See the Runtime section below for more details.
+
 
 ## Install
 **Clone and Install**
@@ -139,6 +141,22 @@ You can start the UI interface by running `python webui.py --device 0`, which al
 For additional CLI and Web UI methods, including alternative implementations and extended functionalities, you can refer to:
 
 - [CLI and UI by AcTePuKc](https://github.com/SparkAudio/Spark-TTS/issues/10)
+
+
+## Runtime
+
+**Nvidia Triton Inference Serving**
+
+We now provide a reference for deploying Spark-TTS with Nvidia Triton and TensorRT-LLM. The table below presents benchmark results on a single L20 GPU, using 26 different prompt_audio/target_text pairs (totalling 169 seconds of audio):
+
+| Model | Note   | Concurrency | Avg Latency     | RTF | 
+|-------|-----------|-----------------------|---------|--|
+| Spark-TTS-0.5B | [Code Commit](https://github.com/SparkAudio/Spark-TTS/tree/4d769ff782a868524f29e0be851ca64f8b22ebf1/runtime/triton_trtllm) | 1                   | 876.24 ms | 0.1362|
+| Spark-TTS-0.5B | [Code Commit](https://github.com/SparkAudio/Spark-TTS/tree/4d769ff782a868524f29e0be851ca64f8b22ebf1/runtime/triton_trtllm) | 2                   | 920.97 ms | 0.0737|
+| Spark-TTS-0.5B | [Code Commit](https://github.com/SparkAudio/Spark-TTS/tree/4d769ff782a868524f29e0be851ca64f8b22ebf1/runtime/triton_trtllm) | 4                   | 1611.51 ms | 0.0704|
+
+
+Please see the detailed instructions in [runtime/triton_trtllm/README.md](runtime/triton_trtllm/README.md ) for more information.
 
 
 ## **Demos**
