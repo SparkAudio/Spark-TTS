@@ -156,10 +156,11 @@ class TokenParser:
 
 # test
 if __name__ == "__main__":
+    import os
     from transformers import AutoTokenizer
 
     tokenizer = AutoTokenizer.from_pretrained(
-        "/aifs4su/xinshengwang/code/StyleCraft/tokenizer/stylecraft-bicodec-pitch-loudness-speed-emotion-tokenizer"
+        os.getenv("TOKENIZER_PATH", "/aifs4su/xinshengwang/code/StyleCraft/tokenizer/stylecraft-bicodec-pitch-loudness-speed-emotion-tokenizer")
     )
 
     tasks = ["tts", "tts", "understand", "controllable_tts", "prompt_tts"]
