@@ -137,10 +137,23 @@ PYTHONPATH=./ python cli/inference_stream.py \
     --model_dir ../../models/SparkAudio/Spark-TTS-0.5B \
     --gender female --pitch  moderate --speed high
 
+PYTHONPATH=./ python cli/inference_stream.py \
+    --text "万物之始,大道至简,衍化至繁。君不见黄河之水天上来，奔流到海不复回。君不见高堂明镜悲白发，朝如青丝暮成雪。人生得意须尽欢，莫使金樽空对月。天生我材必有用，千金散尽还复来。" \
+    --save_dir "example/results" \
+    --model_dir ../../models/SparkAudio/Spark-TTS-0.5B \
+    --gender female --pitch  moderate --speed high
+
 # Inference Overview of Voice Cloning
 # default use static batch is ok
 PYTHONPATH=./ python cli/inference_stream.py \
     --text "身临其境，换新体验。塑造开源语音合成新范式，让智能语音更自然。" \
+    --save_dir "example/results" \
+    --model_dir ../../models/SparkAudio/Spark-TTS-0.5B \
+    --prompt_text "吃燕窝就选燕之屋，本节目由26年专注高品质燕窝的燕之屋冠名播出。豆奶牛奶换着喝，营养更均衡，本节目由豆本豆豆奶特约播出。" \
+    --prompt_speech_path "example/prompt_audio.wav"
+
+PYTHONPATH=./ python cli/inference_stream.py \
+    --text "万物之始,大道至简,衍化至繁。君不见黄河之水天上来，奔流到海不复回。君不见高堂明镜悲白发，朝如青丝暮成雪。人生得意须尽欢，莫使金樽空对月。天生我材必有用，千金散尽还复来。" \
     --save_dir "example/results" \
     --model_dir ../../models/SparkAudio/Spark-TTS-0.5B \
     --prompt_text "吃燕窝就选燕之屋，本节目由26年专注高品质燕窝的燕之屋冠名播出。豆奶牛奶换着喝，营养更均衡，本节目由豆本豆豆奶特约播出。" \
