@@ -391,6 +391,6 @@ class SparkTTS:
                 [controll_gen_global_token_ids + semantic_token_ids], gender, global_token_ids
             )  # one batch
             yield {"tts_speech": sub_tts_speech, "sample_rate": self.sample_rate}
-            logging.info(f"last bath len: {len(semantic_token_ids)}")
+            logging.info(f"last batch len: {len(semantic_token_ids)}")
 
         torch.cuda.empty_cache()

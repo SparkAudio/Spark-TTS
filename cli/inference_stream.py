@@ -158,6 +158,13 @@ PYTHONPATH=./ python cli/inference_stream.py \
     --model_dir ../../models/SparkAudio/Spark-TTS-0.5B \
     --prompt_text "吃燕窝就选燕之屋，本节目由26年专注高品质燕窝的燕之屋冠名播出。豆奶牛奶换着喝，营养更均衡，本节目由豆本豆豆奶特约播出。" \
     --prompt_speech_path "example/prompt_audio.wav"
+
+PYTHONPATH=./ python cli/inference_stream.py \
+    --text "万物之始,大道至简,衍化至繁。" \
+    --save_dir "example/results" \
+    --model_dir ../../models/SparkAudio/Spark-TTS-0.5B \
+    --prompt_text "欢迎大家来体验达摩院推出的语音识别模型" \
+    --prompt_speech_path "../../test/audio_files/asr_example_zh.wav"
 """
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
