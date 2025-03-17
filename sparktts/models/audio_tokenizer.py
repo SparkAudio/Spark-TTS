@@ -43,9 +43,7 @@ class BiCodecTokenizer:
 
     def _initialize_model(self):
         """Load and initialize the BiCodec model and Wav2Vec2 feature extractor."""
-        self.model = BiCodec.load_from_checkpoint(f"{self.model_dir}/BiCodec").to(
-            self.device
-        )
+        self.model = BiCodec.load_from_checkpoint(f"{self.model_dir}/BiCodec").to(self.device)
         self.processor = Wav2Vec2FeatureExtractor.from_pretrained(
             f"{self.model_dir}/wav2vec2-large-xlsr-53"
         )
@@ -82,7 +80,7 @@ class BiCodecTokenizer:
         wav_ref = torch.from_numpy(wav_ref).unsqueeze(0).float()
         return wav, wav_ref
 
-    def extract_wav2vec2_features(self, wavs: torch.Tensor) -> torch.Tensor:
+    def extract_wav2vec2_features(self, wavs: np.ndarray) -> torch.Tensor:
         """extract wav2vec2 features"""
         inputs = self.processor(
             wavs,
@@ -92,9 +90,7 @@ class BiCodecTokenizer:
             output_hidden_states=True,
         ).input_values
         feat = self.feature_extractor(inputs.to(self.feature_extractor.device))
-        feats_mix = (
-            feat.hidden_states[11] + feat.hidden_states[14] + feat.hidden_states[16]
-        ) / 3
+        feats_mix = (feat.hidden_states[11] + feat.hidden_states[14] + feat.hidden_states[16]) / 3
 
         return feats_mix
 
@@ -129,9 +125,7 @@ class BiCodecTokenizer:
 
         return global_tokens, semantic_tokens
 
-    def detokenize(
-        self, global_tokens: torch.Tensor, semantic_tokens: torch.Tensor
-    ) -> np.array:
+    def detokenize(self, global_tokens: torch.Tensor, semantic_tokens: torch.Tensor) -> np.array:
         """detokenize the tokens to waveform
 
         Args:
@@ -149,10 +143,11 @@ class BiCodecTokenizer:
 # test
 if __name__ == "__main__":
     import soundfile as sf
+    import os
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     tokenizer = BiCodecTokenizer(
-        model_dir="pretrained_models/Spark-TTS-0.5B",
+        model_dir=os.getenv("MODEL_DIR", "pretrained_models/Spark-TTS-0.5B"),
         device=device,
     )
     wav_path = "example/prompt_audio.wav"

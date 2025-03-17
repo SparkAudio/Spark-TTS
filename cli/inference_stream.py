@@ -23,6 +23,7 @@ from datetime import datetime
 import platform
 
 from cli.SparkTTS import SparkTTS
+from sparktts.utils.audio import merge_numpy_darray
 
 
 def parse_args():
@@ -52,6 +53,21 @@ def parse_args():
     parser.add_argument("--gender", choices=["male", "female"])
     parser.add_argument("--pitch", choices=["very_low", "low", "moderate", "high", "very_high"])
     parser.add_argument("--speed", choices=["very_low", "low", "moderate", "high", "very_high"])
+    parser.add_argument(
+        "--stream-factor", type=int, default=2, help="Synthesis audios stream factor"
+    )
+    parser.add_argument(
+        "--stream-scale-factor",
+        type=float,
+        default=1.0,
+        help="Synthesis audios stream scale factor",
+    )
+    parser.add_argument(
+        "--max-stream-factor", type=int, default=2, help="Synthesis audios max stream factor"
+    )
+    parser.add_argument(
+        "--token-overlap-len", type=int, default=0, help="Synthesis audios token overlap len"
+    )
     return parser.parse_args()
 
 
@@ -78,17 +94,26 @@ def run_tts(args):
         logging.info("GPU acceleration not available, using CPU")
 
     # Initialize the model
-    model = SparkTTS(args.model_dir, device)
+    model = SparkTTS(
+        args.model_dir,
+        device,
+        stream=True,
+        stream_factor=args.stream_factor,
+        stream_scale_factor=args.stream_scale_factor,
+        max_stream_factor=args.max_stream_factor,
+        token_overlap_len=args.token_overlap_len,
+    )
 
     # Generate unique filename using timestamp
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     save_path = os.path.join(args.save_dir, f"{timestamp}.wav")
 
-    logging.info("Starting inference...")
+    logging.info("Starting stream inference...")
 
+    sub_tts_speechs = []
     # Perform inference and save the output audio
     with torch.no_grad():
-        wav = model.inference(
+        batch_stream = model.inference_stream(
             args.text,
             args.prompt_speech_path,
             prompt_text=args.prompt_text,
@@ -96,21 +121,25 @@ def run_tts(args):
             pitch=args.pitch,
             speed=args.speed,
         )
-        sf.write(save_path, wav, samplerate=16000)
+        for item in batch_stream:
+            sub_tts_speechs.append(item["tts_speech"])
 
+    output_audio = merge_numpy_darray(sub_tts_speechs)  # [[T],...] -> [T]
+    sf.write(save_path, output_audio, samplerate=16000)
     logging.info(f"Audio saved at: {save_path}")
 
 
 """
 # Inference Overview of Controlled Generation
-PYTHONPATH=./ python cli/inference.py \
+PYTHONPATH=./ python cli/inference_stream.py \
     --text "身临其境，换新体验。塑造开源语音合成新范式，让智能语音更自然。" \
     --save_dir "example/results" \
     --model_dir ../../models/SparkAudio/Spark-TTS-0.5B \
     --gender female --pitch  moderate --speed high
 
 # Inference Overview of Voice Cloning
-PYTHONPATH=./ python cli/inference.py \
+# default use static batch is ok
+PYTHONPATH=./ python cli/inference_stream.py \
     --text "身临其境，换新体验。塑造开源语音合成新范式，让智能语音更自然。" \
     --save_dir "example/results" \
     --model_dir ../../models/SparkAudio/Spark-TTS-0.5B \
