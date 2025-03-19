@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import json
+import math
 import os
 import re
 import threading
@@ -280,6 +281,28 @@ class TritonPythonModel:
 
         return waveform
 
+    def token2wav(self, generated_token_ids, global_token_ids):
+        # Decode and extract semantic token IDs from generated text
+        predicted_text = self.tokenizer.batch_decode(
+            [generated_token_ids],
+            skip_special_tokens=True,
+        )[0]
+        pred_semantic_ids = (
+            torch.tensor(
+                [int(token) for token in re.findall(r"bicodec_semantic_(\d+)", predicted_text)]
+            )
+            .unsqueeze(0)
+            .to(torch.int32)
+        )
+
+        # Generate audio with vocoder
+        audio = self.forward_vocoder(
+            global_token_ids.to(self.device),
+            pred_semantic_ids.to(self.device),
+        )
+
+        return audio
+
     def execute(self, requests):
         """Execute inference on the batched requests.
 
@@ -319,40 +342,48 @@ class TritonPythonModel:
             # Generate semantic tokens with LLM
             generated_ids_iter = self.forward_llm_stream(input_ids)
 
+            semantic_token_ids_arr = []
+            max_batch_size = math.ceil(self.max_stream_factor * self.input_frame_rate)
+            batch_size = math.ceil(self.stream_factor * self.input_frame_rate)
+            self.logger.log_info(f"init batch_size: {batch_size} max_batch_size: {max_batch_size}")
+
             for generated_ids in generated_ids_iter:
-                self.logger.log_info(f"Generated IDs: {generated_ids.shape}")
                 if generated_ids is None or len(generated_ids) == 0:
-                    request.get_response_sender().send(
-                        flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL
-                    )
-                    self.logger.log_info(f"send tritonserver_response_complete_final to end")
                     break
-                # Decode and extract semantic token IDs from generated text
-                predicted_text = self.tokenizer.batch_decode(
-                    [generated_ids],
-                    skip_special_tokens=True,
-                )[0]
-                pred_semantic_ids = (
-                    torch.tensor(
-                        [
-                            int(token)
-                            for token in re.findall(r"bicodec_semantic_(\d+)", predicted_text)
-                        ]
+
+                semantic_token_ids_arr.append(generated_ids)
+                # if len(semantic_token_ids_arr) % batch_size == 0:
+                if len(semantic_token_ids_arr) >= batch_size + self.token_overlap_len:
+                    batch = semantic_token_ids_arr[: batch_size + self.token_overlap_len]
+                    generated_semantic_token_ids = np.hstack(batch)
+                    # Process each batch
+                    sub_tts_speech = self.token2wav(generated_semantic_token_ids, global_token_ids)
+                    # Prepare response to send
+                    audio_tensor = pb_utils.Tensor.from_dlpack(
+                        "waveform", to_dlpack(sub_tts_speech)
                     )
-                    .unsqueeze(0)
-                    .to(torch.int32)
-                )
+                    inference_response = pb_utils.InferenceResponse(output_tensors=[audio_tensor])
+                    request.get_response_sender().send(inference_response)
 
-                # Generate audio with vocoder
-                audio = self.forward_vocoder(
-                    global_token_ids.to(self.device),
-                    pred_semantic_ids.to(self.device),
-                )
+                    semantic_token_ids_arr = semantic_token_ids_arr[batch_size:]
+                    # increase token_hop_len for better speech quality
+                    batch_size = min(max_batch_size, int(batch_size * self.stream_scale_factor))
+                    self.logger.log_info(
+                        f"increase batch_size: {batch_size} token_overlap_len:{self.token_overlap_len}"
+                    )
 
-                # Prepare response
-                audio_tensor = pb_utils.Tensor.from_dlpack("waveform", to_dlpack(audio))
+            if len(semantic_token_ids_arr) > 0:  # end to finalize
+                generated_semantic_token_ids = np.hstack(semantic_token_ids_arr)
+                # Process each batch
+                sub_tts_speech = self.token2wav(generated_semantic_token_ids, global_token_ids)
+                # Prepare response to send
+                audio_tensor = pb_utils.Tensor.from_dlpack("waveform", to_dlpack(sub_tts_speech))
                 inference_response = pb_utils.InferenceResponse(output_tensors=[audio_tensor])
                 request.get_response_sender().send(inference_response)
+                self.logger.log_info(f"last batch len: {len(semantic_token_ids_arr)}")
+
+            request.get_response_sender().send(flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+            self.logger.log_info(f"send tritonserver_response_complete_final to end")
 
         # Unlike in non-decoupled model transaction policy, execute function
         # here returns no response. A return from this function only notifies
@@ -372,10 +403,7 @@ class TritonPythonModel:
         # sending back the responses is delegated to this thread.
         thread = threading.Thread(
             target=self.response_thread,
-            args=(
-                request.get_response_sender(),
-                pb_utils.get_input_tensor_by_name(request, "IN").as_numpy(),
-            ),
+            args=(request.get_response_sender(),),
         )
 
         # A model using decoupled transaction policy is not required to send all
@@ -389,7 +417,7 @@ class TritonPythonModel:
 
         thread.start()
 
-    def response_thread(self, response_sender, in_input):
+    def response_thread(self, response_sender):
         # The response_sender is used to send response(s) associated with the
         # corresponding request.
         pass

@@ -1,5 +1,6 @@
 # https://github.com/triton-inference-server/client/tree/main/src/python/examples
 
+import argparse
 from functools import partial
 import os
 import queue
@@ -9,7 +10,8 @@ import numpy as np
 import soundfile as sf
 
 import tritonclient.grpc as grpcclient
-from tritonclient.utils import np_to_triton_dtype,InferenceServerException
+from tritonclient.utils import np_to_triton_dtype, InferenceServerException
+
 
 class UserData:
     def __init__(self):
@@ -22,12 +24,13 @@ def callback(user_data, result, error):
     else:
         user_data._completed_requests.put(result)
 
+
 def tts(
     server_url: str = "localhost:8000",
     reference_audio: str = "/prompt_audio.wav",
     reference_text: str = "吃燕窝就选燕之屋，本节目由26年专注高品质燕窝的燕之屋冠名播出。豆奶牛奶换着喝，营养更均衡，本节目由豆本豆豆奶特约播出。",
     target_text: str = "身临其境，换新体验。塑造开源语音合成新范式，让智能语音更自然。",
-    model_name: str = "spark_tts",
+    model_name: str = "spark_tts_decoupled",
     output_audio: str = "grpc_output.wav",
     verbose: bool = False,
 ):
@@ -53,6 +56,7 @@ def tts(
         inputs,
         request_id=req_id,
         outputs=outputs,
+        enable_empty_final_response=True,  # u need it !!!
     )
 
     audios = []
@@ -60,22 +64,23 @@ def tts(
         data_item = user_data._completed_requests.get()
         if isinstance(data_item, InferenceServerException):
             raise data_item
-
-        if data_item.get_response().parameters["triton_final_response"].bool_param is True:
+        data = data_item.get_response()
+        print(f"parameters:{data.parameters}")
+        final = data.parameters["triton_final_response"].bool_param
+        if final is True:
             break
 
         request_id = data_item.get_response().id
         assert request_id == req_id, f"request id mismatch {request_id} != {req_id}"
         audio = data_item.as_numpy("waveform").reshape(-1)
+        print(audio.shape)
         audios.append(audio)
-        
 
-    audio = np.hstack(audios,dtype=float)
+    audio = np.hstack(audios, dtype=np.float32)
     sf.write(output_audio, audio, 16000, "PCM_16")
     print(f"save audio to {output_audio}")
 
     triton_client.close()
-
 
 
 def prepare_grpc_sdk_request(
@@ -149,3 +154,81 @@ def prepare_grpc_sdk_request(
     inputs[3].set_data_from_numpy(input_data_numpy)
 
     return inputs
+
+
+def get_args():
+    parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+    parser.add_argument(
+        "--server-url",
+        type=str,
+        default="localhost:8000",
+        help="Address of the server",
+    )
+
+    parser.add_argument(
+        "--reference-audio",
+        type=str,
+        default="../../example/prompt_audio.wav",
+        help="Path to a single audio file. It can't be specified at the same time with --manifest-dir",
+    )
+
+    parser.add_argument(
+        "--reference-text",
+        type=str,
+        default="吃燕窝就选燕之屋，本节目由26年专注高品质燕窝的燕之屋冠名播出。豆奶牛奶换着喝，营养更均衡，本节目由豆本豆豆奶特约播出。",
+        help="",
+    )
+
+    parser.add_argument(
+        "--target-text",
+        type=str,
+        default="身临其境，换新体验。塑造开源语音合成新范式，让智能语音更自然。",
+        help="",
+    )
+
+    parser.add_argument(
+        "--model-name",
+        type=str,
+        default="spark_tts_decoupled",
+        choices=["f5_tts", "spark_tts_decoupled"],
+        help="triton model_repo module name to request: transducer for k2, attention_rescoring for wenet offline, streaming_wenet for wenet streaming, infer_pipeline for paraformer large offline",
+    )
+
+    parser.add_argument(
+        "--output-audio",
+        type=str,
+        default="output.wav",
+        help="Path to save the output audio",
+    )
+
+    parser.add_argument(
+        "--verbose",
+        type=bool,
+        default=False,
+        help="Path to save the output audio",
+    )
+    return parser.parse_args()
+
+
+"""
+python runtime/triton_trtllm/client_grpc_stream.py \
+    --server-url r15.modal.host:33585 \
+    --reference-audio example/prompt_audio.wav \
+    --reference-text "吃燕窝就选燕之屋，本节目由26年专注高品质燕窝的燕之屋冠名播出。豆奶牛奶换着喝，营养更均衡，本节目由豆本豆豆奶特约播出。" \
+    --target-text "身临其境，换新体验。塑造开源语音合成新范式，让智能语音更自然。" \
+    --model-name spark_tts \
+    --output-audio output.wav
+"""
+
+if __name__ == "__main__":
+    args = get_args()
+    tts(
+        server_url=args.server_url,
+        reference_audio=args.reference_audio,
+        reference_text=args.reference_text,
+        target_text=args.target_text,
+        model_name=args.model_name,
+        output_audio=args.output_audio,
+        verbose=bool(args.verbose),
+    )
