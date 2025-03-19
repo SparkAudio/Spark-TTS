@@ -2,7 +2,8 @@ export PYTHONPATH=../../../Spark-TTS/
 export CUDA_VISIBLE_DEVICES=0
 stage=$1
 stop_stage=$2
-echo "Start stage: $stage, Stop stage: $stop_stage"
+stream_type=$3
+echo "Start stage: $stage, Stop stage: $stop_stage stream_type: $stream_type"
 
 huggingface_model_local_dir=../../pretrained_models/Spark-TTS-0.5B
 trt_dtype=bfloat16
@@ -35,7 +36,15 @@ fi
 if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
     echo "Creating model repository"
     rm -rf $model_repo
-    cp -r ./model_repo $model_repo
+    mkdir -p $model_repo
+    spark_tts_dir="spark_tts"
+    if [ $stream_type == "stream" ]; then
+        spark_tts_dir="spark_tts_decoupled"
+    fi 
+    cp -r ./model_repo/${spark_tts_dir} $model_repo
+    cp -r ./model_repo/audio_tokenizer $model_repo
+    cp -r ./model_repo/tensorrt_llm $model_repo
+    cp -r ./model_repo/vocoder $model_repo
 
     ENGINE_PATH=$trt_engines_dir
     MAX_QUEUE_DELAY_MICROSECONDS=0
@@ -46,7 +55,11 @@ if [ $stage -le 2 ] && [ $stop_stage -ge 2 ]; then
 
     python3 scripts/fill_template.py -i ${model_repo}/vocoder/config.pbtxt model_dir:${MODEL_DIR},triton_max_batch_size:${TRITON_MAX_BATCH_SIZE},max_queue_delay_microseconds:${MAX_QUEUE_DELAY_MICROSECONDS}
     python3 scripts/fill_template.py -i ${model_repo}/audio_tokenizer/config.pbtxt model_dir:${MODEL_DIR},triton_max_batch_size:${TRITON_MAX_BATCH_SIZE},max_queue_delay_microseconds:${MAX_QUEUE_DELAY_MICROSECONDS}
-    python3 scripts/fill_template.py -i ${model_repo}/spark_tts/config.pbtxt bls_instance_num:${BLS_INSTANCE_NUM},llm_tokenizer_dir:${LLM_TOKENIZER_DIR},triton_max_batch_size:${TRITON_MAX_BATCH_SIZE},max_queue_delay_microseconds:${MAX_QUEUE_DELAY_MICROSECONDS}
+    if [ $stream_type == "stream" ]; then
+        python3 scripts/fill_template.py -i ${model_repo}/${spark_tts_dir}/config.pbtxt bls_instance_num:${BLS_INSTANCE_NUM},llm_tokenizer_dir:${LLM_TOKENIZER_DIR},triton_max_batch_size:${TRITON_MAX_BATCH_SIZE},max_queue_delay_microseconds:${MAX_QUEUE_DELAY_MICROSECONDS},stream_factor:2,stream_scale_factor:1.0,max_stream_factor:2,token_overlap_len:0,input_frame_rate:25
+    else
+        python3 scripts/fill_template.py -i ${model_repo}/${spark_tts_dir}/config.pbtxt bls_instance_num:${BLS_INSTANCE_NUM},llm_tokenizer_dir:${LLM_TOKENIZER_DIR},triton_max_batch_size:${TRITON_MAX_BATCH_SIZE},max_queue_delay_microseconds:${MAX_QUEUE_DELAY_MICROSECONDS}
+    fi
     python3 scripts/fill_template.py -i ${model_repo}/tensorrt_llm/config.pbtxt triton_backend:tensorrtllm,triton_max_batch_size:${TRITON_MAX_BATCH_SIZE},decoupled_mode:False,max_beam_width:1,engine_dir:${ENGINE_PATH},max_tokens_in_paged_kv_cache:2560,max_attention_window_size:2560,kv_cache_free_gpu_mem_fraction:0.5,exclude_input_in_output:True,enable_kv_cache_reuse:False,batching_strategy:inflight_fused_batching,max_queue_delay_microseconds:${MAX_QUEUE_DELAY_MICROSECONDS},encoder_input_features_data_type:TYPE_FP16,logits_datatype:TYPE_FP32
 
 fi
