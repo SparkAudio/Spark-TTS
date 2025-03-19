@@ -28,6 +28,7 @@ import json
 import os
 import re
 import threading
+import time
 from typing import Dict, List, Tuple, Optional, Union
 
 import numpy as np
@@ -109,9 +110,26 @@ class TritonPythonModel:
         Args:
             args: Dictionary containing model configuration
         """
+        self.logger = pb_utils.Logger
         # Parse model parameters
         parameters = json.loads(args["model_config"])["parameters"]
         model_params = {k: v["string_value"] for k, v in parameters.items()}
+        self.logger.log_info(f"model_params:{model_params}")
+
+        assert (
+            int(model_params["stream_factor"]) >= 2
+        ), f"stream_factor must >=2 increase for better speech quality, but rtf slow (speech quality vs rtf)"
+        self.stream_factor = int(model_params["stream_factor"])
+        self.max_stream_factor = int(model_params["max_stream_factor"])
+        assert (
+            float(model_params["stream_scale_factor"]) >= 1.0
+        ), "stream_scale_factor should be greater than 1, change it according to your actual rtf"
+        self.stream_scale_factor = float(model_params["stream_scale_factor"])  # scale speed
+        assert (
+            int(model_params["token_overlap_len"]) >= 0
+        ), "token_overlap_len should be greater than 0, change it according to your actual rtf"
+        self.token_overlap_len = int(model_params["token_overlap_len"])
+        self.input_frame_rate = int(model_params["input_frame_rate"])
 
         # Initialize tokenizer
         llm_tokenizer_dir = model_params["llm_tokenizer_dir"]
@@ -140,7 +158,7 @@ class TritonPythonModel:
 
         params: input_ids: torch.Tensor [1, sequence_length] - The input token IDs for the language model.
 
-        return: output_ids generator: torch.Tensor [1, sequence_length] - The generated token IDs.
+        return: output_ids generator: numpy.ndarray [sequence_length] - The generated token IDs.
         """
         # convert input_ids to numpy, with shape [1, sequence_length]
         input_ids = input_ids.cpu().numpy()
@@ -302,10 +320,12 @@ class TritonPythonModel:
             generated_ids_iter = self.forward_llm_stream(input_ids)
 
             for generated_ids in generated_ids_iter:
-                if generated_ids is None:
+                self.logger.log_info(f"Generated IDs: {generated_ids.shape}")
+                if generated_ids is None or len(generated_ids) == 0:
                     request.get_response_sender().send(
                         flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL
                     )
+                    self.logger.log_info(f"send tritonserver_response_complete_final to end")
                     break
                 # Decode and extract semantic token IDs from generated text
                 predicted_text = self.tokenizer.batch_decode(
@@ -344,6 +364,7 @@ class TritonPythonModel:
         # instance at a time. In real-world models, the developer should be
         # mindful of when to return from execute and be willing to accept next
         # request batch.
+        self.logger.log_info(f"over")
         return None
 
     def process_request(self, request):
@@ -375,3 +396,31 @@ class TritonPythonModel:
 
         with self.inflight_thread_count_lck:
             self.inflight_thread_count -= 1
+
+    def finalize(self):
+        """`finalize` is called only once when the model is being unloaded.
+        Implementing `finalize` function is OPTIONAL. This function allows
+        the model to perform any necessary clean ups before exit.
+        Here we will wait for all response threads to complete sending
+        responses.
+        """
+
+        self.logger.log_info("Finalize invoked")
+
+        inflight_threads = True
+        cycles = 0
+        logging_time_sec = 5
+        sleep_time_sec = 0.1
+        cycle_to_log = logging_time_sec / sleep_time_sec
+        while inflight_threads:
+            with self.inflight_thread_count_lck:
+                inflight_threads = self.inflight_thread_count != 0
+                if cycles % cycle_to_log == 0:
+                    self.logger.log_info(
+                        f"Waiting for {self.inflight_thread_count} response threads to complete..."
+                    )
+            if inflight_threads:
+                time.sleep(sleep_time_sec)
+                cycles += 1
+
+        self.logger.log_info("Finalize complete...")

@@ -25,6 +25,26 @@ parameters [
   {
    key: "llm_tokenizer_dir", 
    value: {string_value:"${llm_tokenizer_dir}"}
+  },
+  {
+   key: "stream_factor", 
+   value: {string_value:"${stream_factor}"}
+  },
+  {
+   key: "stream_scale_factor", 
+   value: {string_value:"${stream_scale_factor}"}
+  },
+  {
+   key: "max_stream_factor", 
+   value: {string_value:"${max_stream_factor}"}
+  },
+  {
+   key: "token_overlap_len", 
+   value: {string_value:"${token_overlap_len}"}
+  },
+  {
+   key: "input_frame_rate", 
+   value: {string_value:"${input_frame_rate}"}
   }
 ]
 
