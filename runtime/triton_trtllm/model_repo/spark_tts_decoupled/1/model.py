@@ -395,8 +395,8 @@ class TritonPythonModel:
 
             semantic_token_ids_arr.append(generated_ids)
             # if len(semantic_token_ids_arr) % chunk_size == 0:
-            if len(semantic_token_ids_arr) >= chunk_size + self.token_overlap_len:
-                chunk = semantic_token_ids_arr[: chunk_size + self.token_overlap_len]
+            if len(semantic_token_ids_arr) >= chunk_size:
+                chunk = semantic_token_ids_arr[:chunk_size]
                 generated_semantic_token_ids = np.hstack(chunk)
                 # Process each chunk
                 sub_tts_speech = self.token2wav(generated_semantic_token_ids, global_token_ids)
@@ -408,9 +408,7 @@ class TritonPythonModel:
                 semantic_token_ids_arr = semantic_token_ids_arr[chunk_size:]
                 # increase token_hop_len for better speech quality
                 chunk_size = min(max_chunk_size, int(chunk_size * self.stream_scale_factor))
-                self.logger.log_info(
-                    f"[{request_id}] increase chunk_size: {chunk_size} token_overlap_len:{self.token_overlap_len}"
-                )
+                self.logger.log_info(f"[{request_id}] increase chunk_size: {chunk_size}")
 
         if len(semantic_token_ids_arr) > 0:  # end to finalize
             generated_semantic_token_ids = np.hstack(semantic_token_ids_arr)
