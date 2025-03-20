@@ -65,9 +65,6 @@ def parse_args():
     parser.add_argument(
         "--max-stream-factor", type=int, default=2, help="Synthesis audios max stream factor"
     )
-    parser.add_argument(
-        "--token-overlap-len", type=int, default=0, help="Synthesis audios token overlap len"
-    )
     return parser.parse_args()
 
 
@@ -101,7 +98,6 @@ def run_tts(args):
         stream_factor=args.stream_factor,
         stream_scale_factor=args.stream_scale_factor,
         max_stream_factor=args.max_stream_factor,
-        token_overlap_len=args.token_overlap_len,
     )
 
     # Generate unique filename using timestamp
@@ -126,7 +122,8 @@ def run_tts(args):
 
     output_audio = merge_numpy_darray(sub_tts_speechs)  # [[T],...] -> [T]
     sf.write(save_path, output_audio, samplerate=16000)
-    logging.info(f"Audio saved at: {save_path}")
+    sf_info = sf.info(save_path,verbose=True)
+    logging.info(f"Audio saved at: {save_path} duration: {sf_info.duration:.3f} seconds")
 
 
 """

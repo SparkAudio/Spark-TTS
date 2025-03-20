@@ -39,12 +39,8 @@ parameters [
    value: {string_value:"${max_stream_factor}"}
   },
   {
-   key: "token_overlap_len", 
-   value: {string_value:"${token_overlap_len}"}
-  },
-  {
-   key: "input_frame_rate", 
-   value: {string_value:"${input_frame_rate}"}
+   key: "semantic_tokens_chuck_size", 
+   value: {string_value:"${semantic_tokens_chuck_size}"}
   }
 ]
 

@@ -40,11 +40,9 @@ class SparkTTS:
         model_dir: Path,
         device: torch.device = torch.device("cuda:0"),
         stream: bool = False,
-        stream_factor: int = 2,
+        stream_factor: int = 1,
         stream_scale_factor: float = 1.0,
-        max_stream_factor: int = 2,
-        token_overlap_len: int = 0,
-        input_frame_rate: int = 25,
+        max_stream_factor: int = 1,
         **kwargs,
     ):
         """
@@ -54,28 +52,25 @@ class SparkTTS:
             model_dir (Path): Directory containing the model and config files.
             device (torch.device): The device (CPU/GPU) to run the model on.
         """
+        self.configs = load_config(f"{model_dir}/config.yaml")
+        self.device = device
+        self.model_dir = model_dir
+        self.sample_rate = self.configs["sample_rate"]
+
         if stream is True:
             # fast path to check params
             # rtf and decoding related
             assert (
-                stream_factor >= 2
-            ), f"stream_factor must >=2 increase for better speech quality, but rtf slow (speech quality vs rtf)"
+                stream_factor >= 1
+            ), f"stream_factor must >=1 increase for better speech quality, but rtf slow (speech quality vs rtf)"
             self.stream_factor = stream_factor
             self.max_stream_factor = max_stream_factor
             assert (
                 stream_scale_factor >= 1.0
             ), "stream_scale_factor should be greater than 1, change it according to your actual rtf"
             self.stream_scale_factor = stream_scale_factor  # scale speed
-            assert (
-                token_overlap_len >= 0
-            ), "token_overlap_len should be greater than 0, change it according to your actual rtf"
-            self.token_overlap_len = token_overlap_len
-            self.input_frame_rate = input_frame_rate
+            self.semantic_tokens_chuck_size = 25
 
-        self.device = device
-        self.model_dir = model_dir
-        self.configs = load_config(f"{model_dir}/config.yaml")
-        self.sample_rate = self.configs["sample_rate"]
         self._initialize_inference()
         self.start_global_token_id = self.tokenizer.encode("<|start_global_token|>")[0]
         self.start_semantic_token_id = self.tokenizer.encode("<|start_semantic_token|>")[0]
@@ -339,9 +334,9 @@ class SparkTTS:
         controll_gen_global_token_ids = []
         semantic_token_ids = []
 
-        max_batch_size = math.ceil(self.max_stream_factor * self.input_frame_rate)
-        batch_size = math.ceil(self.stream_factor * self.input_frame_rate)
-        logging.info(f"init batch_size: {batch_size} max_batch_size: {max_batch_size}")
+        max_chunk_size = math.ceil(self.max_stream_factor * self.semantic_tokens_chuck_size)
+        chunk_size = math.ceil(self.stream_factor * self.semantic_tokens_chuck_size)
+        logging.info(f"init chunk_size: {chunk_size} max_chunk_size: {max_chunk_size}")
 
         for token_id in streamer:
             if gender is not None:  # Inference Overview of Controlled Generation
@@ -371,26 +366,26 @@ class SparkTTS:
 
             semantic_token_ids.append(token_id)
             # if len(semantic_token_ids) % batch_size == 0:
-            if len(semantic_token_ids) >= batch_size + self.token_overlap_len:
-                batch = semantic_token_ids[: batch_size + self.token_overlap_len]
-                # Process each batch
+            if len(semantic_token_ids) >= chunk_size:
+                chunk = semantic_token_ids[: chunk_size]
+                # Process each chunk
                 sub_tts_speech = self.token2wav(
-                    [controll_gen_global_token_ids + batch], gender, global_token_ids
-                )  # one batch
+                    [controll_gen_global_token_ids + chunk], gender, global_token_ids
+                )  # one chunk
                 yield {"tts_speech": sub_tts_speech, "sample_rate": self.sample_rate}
-                semantic_token_ids = semantic_token_ids[batch_size:]
+                semantic_token_ids = semantic_token_ids[chunk_size:]
                 # increase token_hop_len for better speech quality
-                batch_size = min(max_batch_size, int(batch_size * self.stream_scale_factor))
+                chunk_size = min(max_chunk_size, int(chunk_size * self.stream_scale_factor))
                 logging.info(
-                    f"increase batch_size: {batch_size} token_overlap_len:{self.token_overlap_len}"
+                    f"increase chunk_size: {chunk_size}"
                 )
 
         if len(semantic_token_ids) > 0:  # end to finalize
-            # Process each batch
+            # Process each chunk
             sub_tts_speech = self.token2wav(
                 [controll_gen_global_token_ids + semantic_token_ids], gender, global_token_ids
-            )  # one batch
+            )  # one chunk
             yield {"tts_speech": sub_tts_speech, "sample_rate": self.sample_rate}
-            logging.info(f"last batch len: {len(semantic_token_ids)}")
+            logging.info(f"last chunk len: {len(semantic_token_ids)}")
 
         torch.cuda.empty_cache()
