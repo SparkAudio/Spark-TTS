@@ -118,8 +118,8 @@ class TritonPythonModel:
         self.logger.log_info(f"model_params:{model_params}")
 
         assert (
-            int(model_params["stream_factor"]) >= 2
-        ), f"stream_factor must >=2 increase for better speech quality, but rtf slow (speech quality vs rtf)"
+            int(model_params["stream_factor"]) >= 1
+        ), f"stream_factor must >=1 to start increase"
         self.stream_factor = int(model_params["stream_factor"])
         self.max_stream_factor = int(model_params["max_stream_factor"])
         assert (
