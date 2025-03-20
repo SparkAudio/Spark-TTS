@@ -126,7 +126,7 @@ class TritonPythonModel:
             float(model_params["stream_scale_factor"]) >= 1.0
         ), "stream_scale_factor should be greater than 1, change it according to your actual rtf"
         self.stream_scale_factor = float(model_params["stream_scale_factor"])  # scale speed
-        self.semantic_tokens_chuck_size = int(model_params["semantic_tokens_chuck_size"])
+        self.semantic_tokens_chunk_size = int(model_params["semantic_tokens_chunk_size"])
 
         # Initialize tokenizer
         llm_tokenizer_dir = model_params["llm_tokenizer_dir"]
@@ -383,8 +383,8 @@ class TritonPythonModel:
         generated_ids_iter = self.forward_llm_stream(input_ids)
 
         semantic_token_ids_arr = []
-        max_chunk_size = math.ceil(self.max_stream_factor * self.semantic_tokens_chuck_size)
-        chunk_size = math.ceil(self.stream_factor * self.semantic_tokens_chuck_size)
+        max_chunk_size = math.ceil(self.max_stream_factor * self.semantic_tokens_chunk_size)
+        chunk_size = math.ceil(self.stream_factor * self.semantic_tokens_chunk_size)
         self.logger.log_info(
             f"[{request_id}] init chunk_size: {chunk_size} max_chunk_size: {max_chunk_size}"
         )

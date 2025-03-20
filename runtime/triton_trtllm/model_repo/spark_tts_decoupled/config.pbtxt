@@ -39,8 +39,8 @@ parameters [
    value: {string_value:"${max_stream_factor}"}
   },
   {
-   key: "semantic_tokens_chuck_size", 
-   value: {string_value:"${semantic_tokens_chuck_size}"}
+   key: "semantic_tokens_chunk_size", 
+   value: {string_value:"${semantic_tokens_chunk_size}"}
   }
 ]
 
