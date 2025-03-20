@@ -126,11 +126,7 @@ class TritonPythonModel:
             float(model_params["stream_scale_factor"]) >= 1.0
         ), "stream_scale_factor should be greater than 1, change it according to your actual rtf"
         self.stream_scale_factor = float(model_params["stream_scale_factor"])  # scale speed
-        assert (
-            int(model_params["token_overlap_len"]) >= 0
-        ), "token_overlap_len should be greater than 0, change it according to your actual rtf"
-        self.token_overlap_len = int(model_params["token_overlap_len"])
-        self.input_frame_rate = int(model_params["input_frame_rate"])
+        self.semantic_tokens_chuck_size = int(model_params["semantic_tokens_chuck_size"])
 
         # Initialize tokenizer
         llm_tokenizer_dir = model_params["llm_tokenizer_dir"]
@@ -387,10 +383,10 @@ class TritonPythonModel:
         generated_ids_iter = self.forward_llm_stream(input_ids)
 
         semantic_token_ids_arr = []
-        max_batch_size = math.ceil(self.max_stream_factor * self.input_frame_rate)
-        batch_size = math.ceil(self.stream_factor * self.input_frame_rate)
+        max_chunk_size = math.ceil(self.max_stream_factor * self.semantic_tokens_chuck_size)
+        chunk_size = math.ceil(self.stream_factor * self.semantic_tokens_chuck_size)
         self.logger.log_info(
-            f"[{request_id}] init batch_size: {batch_size} max_batch_size: {max_batch_size}"
+            f"[{request_id}] init chunk_size: {chunk_size} max_chunk_size: {max_chunk_size}"
         )
 
         for generated_ids in generated_ids_iter:
@@ -398,33 +394,33 @@ class TritonPythonModel:
                 break
 
             semantic_token_ids_arr.append(generated_ids)
-            # if len(semantic_token_ids_arr) % batch_size == 0:
-            if len(semantic_token_ids_arr) >= batch_size + self.token_overlap_len:
-                batch = semantic_token_ids_arr[: batch_size + self.token_overlap_len]
-                generated_semantic_token_ids = np.hstack(batch)
-                # Process each batch
+            # if len(semantic_token_ids_arr) % chunk_size == 0:
+            if len(semantic_token_ids_arr) >= chunk_size + self.token_overlap_len:
+                chunk = semantic_token_ids_arr[: chunk_size + self.token_overlap_len]
+                generated_semantic_token_ids = np.hstack(chunk)
+                # Process each chunk
                 sub_tts_speech = self.token2wav(generated_semantic_token_ids, global_token_ids)
                 # Prepare response to send
                 audio_tensor = pb_utils.Tensor.from_dlpack("waveform", to_dlpack(sub_tts_speech))
                 inference_response = pb_utils.InferenceResponse(output_tensors=[audio_tensor])
                 response_sender.send(inference_response)
 
-                semantic_token_ids_arr = semantic_token_ids_arr[batch_size:]
+                semantic_token_ids_arr = semantic_token_ids_arr[chunk_size:]
                 # increase token_hop_len for better speech quality
-                batch_size = min(max_batch_size, int(batch_size * self.stream_scale_factor))
+                chunk_size = min(max_chunk_size, int(chunk_size * self.stream_scale_factor))
                 self.logger.log_info(
-                    f"[{request_id}] increase batch_size: {batch_size} token_overlap_len:{self.token_overlap_len}"
+                    f"[{request_id}] increase chunk_size: {chunk_size} token_overlap_len:{self.token_overlap_len}"
                 )
 
         if len(semantic_token_ids_arr) > 0:  # end to finalize
             generated_semantic_token_ids = np.hstack(semantic_token_ids_arr)
-            # Process each batch
+            # Process each chunk
             sub_tts_speech = self.token2wav(generated_semantic_token_ids, global_token_ids)
             # Prepare response to send
             audio_tensor = pb_utils.Tensor.from_dlpack("waveform", to_dlpack(sub_tts_speech))
             inference_response = pb_utils.InferenceResponse(output_tensors=[audio_tensor])
             response_sender.send(inference_response)
-            self.logger.log_info(f"[{request_id}] last batch len: {len(semantic_token_ids_arr)}")
+            self.logger.log_info(f"[{request_id}] last chunk len: {len(semantic_token_ids_arr)}")
 
         response_sender.send(flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
         self.logger.log_info(f"[{request_id}] send tritonserver_response_complete_final to end")
