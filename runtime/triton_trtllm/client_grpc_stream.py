@@ -217,7 +217,7 @@ python runtime/triton_trtllm/client_grpc_stream.py \
     --reference-audio example/prompt_audio.wav \
     --reference-text "吃燕窝就选燕之屋，本节目由26年专注高品质燕窝的燕之屋冠名播出。豆奶牛奶换着喝，营养更均衡，本节目由豆本豆豆奶特约播出。" \
     --target-text "身临其境，换新体验。塑造开源语音合成新范式，让智能语音更自然。" \
-    --model-name spark_tts \
+    --model-name spark_tts_decoupled \
     --output-audio output.wav
 """
 

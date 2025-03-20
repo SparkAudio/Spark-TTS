@@ -313,77 +313,7 @@ class TritonPythonModel:
             List of inference responses containing generated audio
         """
         for request in requests:
-            # Extract input tensors
-            wav = pb_utils.get_input_tensor_by_name(request, "reference_wav")
-            wav_len = pb_utils.get_input_tensor_by_name(request, "reference_wav_len")
-
-            # Process reference audio through audio tokenizer
-            global_tokens, semantic_tokens = self.forward_audio_tokenizer(wav, wav_len)
-
-            # Extract text inputs
-            reference_text = pb_utils.get_input_tensor_by_name(request, "reference_text").as_numpy()
-            reference_text = reference_text[0][0].decode("utf-8")
-
-            target_text = pb_utils.get_input_tensor_by_name(request, "target_text").as_numpy()
-            target_text = target_text[0][0].decode("utf-8")
-
-            # Prepare prompt for LLM
-            prompt, global_token_ids = process_prompt(
-                text=target_text,
-                prompt_text=reference_text,
-                global_token_ids=global_tokens,
-                semantic_token_ids=semantic_tokens,
-            )
-
-            # Tokenize prompt for LLM
-            model_inputs = self.tokenizer([prompt], return_tensors="pt").to(self.device)
-            input_ids = model_inputs.input_ids.to(torch.int32)
-
-            # Generate semantic tokens with LLM
-            generated_ids_iter = self.forward_llm_stream(input_ids)
-
-            semantic_token_ids_arr = []
-            max_batch_size = math.ceil(self.max_stream_factor * self.input_frame_rate)
-            batch_size = math.ceil(self.stream_factor * self.input_frame_rate)
-            self.logger.log_info(f"init batch_size: {batch_size} max_batch_size: {max_batch_size}")
-
-            for generated_ids in generated_ids_iter:
-                if generated_ids is None or len(generated_ids) == 0:
-                    break
-
-                semantic_token_ids_arr.append(generated_ids)
-                # if len(semantic_token_ids_arr) % batch_size == 0:
-                if len(semantic_token_ids_arr) >= batch_size + self.token_overlap_len:
-                    batch = semantic_token_ids_arr[: batch_size + self.token_overlap_len]
-                    generated_semantic_token_ids = np.hstack(batch)
-                    # Process each batch
-                    sub_tts_speech = self.token2wav(generated_semantic_token_ids, global_token_ids)
-                    # Prepare response to send
-                    audio_tensor = pb_utils.Tensor.from_dlpack(
-                        "waveform", to_dlpack(sub_tts_speech)
-                    )
-                    inference_response = pb_utils.InferenceResponse(output_tensors=[audio_tensor])
-                    request.get_response_sender().send(inference_response)
-
-                    semantic_token_ids_arr = semantic_token_ids_arr[batch_size:]
-                    # increase token_hop_len for better speech quality
-                    batch_size = min(max_batch_size, int(batch_size * self.stream_scale_factor))
-                    self.logger.log_info(
-                        f"increase batch_size: {batch_size} token_overlap_len:{self.token_overlap_len}"
-                    )
-
-            if len(semantic_token_ids_arr) > 0:  # end to finalize
-                generated_semantic_token_ids = np.hstack(semantic_token_ids_arr)
-                # Process each batch
-                sub_tts_speech = self.token2wav(generated_semantic_token_ids, global_token_ids)
-                # Prepare response to send
-                audio_tensor = pb_utils.Tensor.from_dlpack("waveform", to_dlpack(sub_tts_speech))
-                inference_response = pb_utils.InferenceResponse(output_tensors=[audio_tensor])
-                request.get_response_sender().send(inference_response)
-                self.logger.log_info(f"last batch len: {len(semantic_token_ids_arr)}")
-
-            request.get_response_sender().send(flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
-            self.logger.log_info(f"send tritonserver_response_complete_final to end")
+            self.process_request(request)
 
         # Unlike in non-decoupled model transaction policy, execute function
         # here returns no response. A return from this function only notifies
@@ -395,15 +325,30 @@ class TritonPythonModel:
         # instance at a time. In real-world models, the developer should be
         # mindful of when to return from execute and be willing to accept next
         # request batch.
-        self.logger.log_info(f"over")
         return None
 
     def process_request(self, request):
+        # Extract input tensors
+        wav = pb_utils.get_input_tensor_by_name(request, "reference_wav")
+        wav_len = pb_utils.get_input_tensor_by_name(request, "reference_wav_len")
+        # Extract text inputs
+        reference_text = pb_utils.get_input_tensor_by_name(request, "reference_text").as_numpy()
+        reference_text = reference_text[0][0].decode("utf-8")
+        target_text = pb_utils.get_input_tensor_by_name(request, "target_text").as_numpy()
+        target_text = target_text[0][0].decode("utf-8")
+
         # Start a separate thread to send the responses for the request. The
         # sending back the responses is delegated to this thread.
         thread = threading.Thread(
             target=self.response_thread,
-            args=(request.get_response_sender(),),
+            args=(
+                request.request_id(),
+                request.get_response_sender(),
+                wav,
+                wav_len,
+                reference_text,
+                target_text,
+            ),
         )
 
         # A model using decoupled transaction policy is not required to send all
@@ -417,10 +362,72 @@ class TritonPythonModel:
 
         thread.start()
 
-    def response_thread(self, response_sender):
+    def response_thread(
+        self, request_id, response_sender, wav, wav_len, reference_text, target_text
+    ):
         # The response_sender is used to send response(s) associated with the
         # corresponding request.
-        pass
+
+        # Process reference audio through audio tokenizer
+        global_tokens, semantic_tokens = self.forward_audio_tokenizer(wav, wav_len)
+
+        # Prepare prompt for LLM
+        prompt, global_token_ids = process_prompt(
+            text=target_text,
+            prompt_text=reference_text,
+            global_token_ids=global_tokens,
+            semantic_token_ids=semantic_tokens,
+        )
+
+        # Tokenize prompt for LLM
+        model_inputs = self.tokenizer([prompt], return_tensors="pt").to(self.device)
+        input_ids = model_inputs.input_ids.to(torch.int32)
+
+        # Generate semantic tokens with LLM
+        generated_ids_iter = self.forward_llm_stream(input_ids)
+
+        semantic_token_ids_arr = []
+        max_batch_size = math.ceil(self.max_stream_factor * self.input_frame_rate)
+        batch_size = math.ceil(self.stream_factor * self.input_frame_rate)
+        self.logger.log_info(
+            f"[{request_id}] init batch_size: {batch_size} max_batch_size: {max_batch_size}"
+        )
+
+        for generated_ids in generated_ids_iter:
+            if generated_ids is None or len(generated_ids) == 0:
+                break
+
+            semantic_token_ids_arr.append(generated_ids)
+            # if len(semantic_token_ids_arr) % batch_size == 0:
+            if len(semantic_token_ids_arr) >= batch_size + self.token_overlap_len:
+                batch = semantic_token_ids_arr[: batch_size + self.token_overlap_len]
+                generated_semantic_token_ids = np.hstack(batch)
+                # Process each batch
+                sub_tts_speech = self.token2wav(generated_semantic_token_ids, global_token_ids)
+                # Prepare response to send
+                audio_tensor = pb_utils.Tensor.from_dlpack("waveform", to_dlpack(sub_tts_speech))
+                inference_response = pb_utils.InferenceResponse(output_tensors=[audio_tensor])
+                response_sender.send(inference_response)
+
+                semantic_token_ids_arr = semantic_token_ids_arr[batch_size:]
+                # increase token_hop_len for better speech quality
+                batch_size = min(max_batch_size, int(batch_size * self.stream_scale_factor))
+                self.logger.log_info(
+                    f"[{request_id}] increase batch_size: {batch_size} token_overlap_len:{self.token_overlap_len}"
+                )
+
+        if len(semantic_token_ids_arr) > 0:  # end to finalize
+            generated_semantic_token_ids = np.hstack(semantic_token_ids_arr)
+            # Process each batch
+            sub_tts_speech = self.token2wav(generated_semantic_token_ids, global_token_ids)
+            # Prepare response to send
+            audio_tensor = pb_utils.Tensor.from_dlpack("waveform", to_dlpack(sub_tts_speech))
+            inference_response = pb_utils.InferenceResponse(output_tensors=[audio_tensor])
+            response_sender.send(inference_response)
+            self.logger.log_info(f"[{request_id}] last batch len: {len(semantic_token_ids_arr)}")
+
+        response_sender.send(flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+        self.logger.log_info(f"[{request_id}] send tritonserver_response_complete_final to end")
 
         with self.inflight_thread_count_lck:
             self.inflight_thread_count -= 1
@@ -432,7 +439,6 @@ class TritonPythonModel:
         Here we will wait for all response threads to complete sending
         responses.
         """
-
         self.logger.log_info("Finalize invoked")
 
         inflight_threads = True
