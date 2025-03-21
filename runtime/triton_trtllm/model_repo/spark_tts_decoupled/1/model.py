@@ -118,15 +118,16 @@ class TritonPythonModel:
         self.logger.log_info(f"model_params:{model_params}")
 
         assert (
-            int(model_params["stream_factor"]) >= 1
-        ), f"stream_factor must >=1 to start increase"
-        self.stream_factor = int(model_params["stream_factor"])
-        self.max_stream_factor = int(model_params["max_stream_factor"])
+            float(model_params["audio_chunk_duration"]) >= 0.5
+        ), f"audio_chunk_duration at least 0.5 seconds"
+        self.audio_chunk_duration = float(model_params["audio_chunk_duration"])
+        self.max_audio_chunk_duration = float(model_params["max_audio_chunk_duration"])
         assert (
-            float(model_params["stream_scale_factor"]) >= 1.0
-        ), "stream_scale_factor should be greater than 1, change it according to your actual rtf"
-        self.stream_scale_factor = float(model_params["stream_scale_factor"])  # scale speed
-        self.semantic_tokens_chunk_size = int(model_params["semantic_tokens_chunk_size"])
+            float(model_params["audio_chunk_size_scale_factor"]) >= 1.0
+        ), "audio_chunk_size_scale_factor should be greater than 1, change it according to your actual rtf"
+        self.audio_chunk_size_scale_factor = float(model_params["audio_chunk_size_scale_factor"])  # scale speed
+        self.audio_chunk_overlap_duration = float(model_params["audio_chunk_overlap_duration"])
+        self.audio_tokenizer_frame_rate = int(model_params["audio_tokenizer_frame_rate"])
 
         # Initialize tokenizer
         llm_tokenizer_dir = model_params["llm_tokenizer_dir"]
@@ -383,8 +384,9 @@ class TritonPythonModel:
         generated_ids_iter = self.forward_llm_stream(input_ids)
 
         semantic_token_ids_arr = []
-        max_chunk_size = math.ceil(self.max_stream_factor * self.semantic_tokens_chunk_size)
-        chunk_size = math.ceil(self.stream_factor * self.semantic_tokens_chunk_size)
+        max_chunk_size = math.ceil(self.max_audio_chunk_duration * self.audio_tokenizer_frame_rate)
+        chunk_size = math.ceil(self.audio_chunk_duration * self.audio_tokenizer_frame_rate)
+        overlap_chunk_size = math.ceil(self.audio_chunk_overlap_duration * self.audio_tokenizer_frame_rate)
         self.logger.log_info(
             f"[{request_id}] init chunk_size: {chunk_size} max_chunk_size: {max_chunk_size}"
         )
@@ -394,7 +396,6 @@ class TritonPythonModel:
                 break
 
             semantic_token_ids_arr.append(generated_ids)
-            # if len(semantic_token_ids_arr) % chunk_size == 0:
             if len(semantic_token_ids_arr) >= chunk_size:
                 chunk = semantic_token_ids_arr[:chunk_size]
                 generated_semantic_token_ids = np.hstack(chunk)
@@ -405,9 +406,9 @@ class TritonPythonModel:
                 inference_response = pb_utils.InferenceResponse(output_tensors=[audio_tensor])
                 response_sender.send(inference_response)
 
-                semantic_token_ids_arr = semantic_token_ids_arr[chunk_size:]
-                # increase token_hop_len for better speech quality
-                chunk_size = min(max_chunk_size, int(chunk_size * self.stream_scale_factor))
+                semantic_token_ids_arr = semantic_token_ids_arr[chunk_size - overlap_chunk_size:]
+                # increase chunk size for better speech quality
+                chunk_size = min(max_chunk_size, int(chunk_size * self.audio_chunk_size_scale_factor))
                 self.logger.log_info(f"[{request_id}] increase chunk_size: {chunk_size}")
 
         if len(semantic_token_ids_arr) > 0:  # end to finalize

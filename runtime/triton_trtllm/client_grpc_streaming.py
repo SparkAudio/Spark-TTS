@@ -33,7 +33,12 @@ def tts(
     model_name: str = "spark_tts_decoupled",
     output_audio: str = "grpc_output.wav",
     verbose: bool = False,
+    chunk_overlap_duration: float = 0.1,
 ):
+    cross_fade_samples = int(chunk_overlap_duration * 16000)
+    fade_out = np.linspace(1, 0, cross_fade_samples)
+    fade_in = np.linspace(0, 1, cross_fade_samples)
+
     waveform, sr = sf.read(reference_audio)
     duration = sf.info(reference_audio).duration
     assert sr == 16000, "sample rate hardcoded in server"
@@ -76,12 +81,18 @@ def tts(
         print(audio.shape)
         audios.append(audio)
 
-    audio = np.hstack(audios, dtype=np.float32)
-    sf.write(output_audio, audio, 16000, "PCM_16")
+    for i, audio in enumerate(audios):
+        if i == 0:
+            new_audio = audio[:-cross_fade_samples]
+        else:
+            cross_faded_overlap = audio[:cross_fade_samples] * fade_in + audios[i - 1][-cross_fade_samples:] * fade_out
+            new_audio = np.concatenate([new_audio, cross_faded_overlap, audio[cross_fade_samples:-cross_fade_samples]])
+    new_audio = np.concatenate([new_audio, audio[-cross_fade_samples:]])
+
+    sf.write(output_audio, new_audio, 16000, "PCM_16")
     print(f"save audio to {output_audio}")
 
     triton_client.close()
-
 
 def prepare_grpc_sdk_request(
     waveform,
@@ -208,6 +219,14 @@ def get_args():
         default=False,
         help="Path to save the output audio",
     )
+
+    parser.add_argument(
+        "--chunk-overlap-duration",
+        type=float,
+        default=0.1,
+        help="Chunk overlap duration",
+    )
+    
     return parser.parse_args()
 
 
@@ -231,4 +250,5 @@ if __name__ == "__main__":
         model_name=args.model_name,
         output_audio=args.output_audio,
         verbose=bool(args.verbose),
+        chunk_overlap_duration=args.chunk_overlap_duration,
     )
