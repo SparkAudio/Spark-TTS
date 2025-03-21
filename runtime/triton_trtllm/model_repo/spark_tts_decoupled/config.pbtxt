@@ -1,0 +1,86 @@
+# Copyright (c) 2025, NVIDIA CORPORATION.  All rights reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: "spark_tts_decoupled"
+backend: "python"
+max_batch_size: ${triton_max_batch_size}
+dynamic_batching {
+    max_queue_delay_microseconds: ${max_queue_delay_microseconds}
+}
+model_transaction_policy {
+  decoupled: True
+}
+parameters [
+  {
+   key: "llm_tokenizer_dir", 
+   value: {string_value:"${llm_tokenizer_dir}"}
+  },
+  {
+   key: "audio_chunk_duration", 
+   value: {string_value:"${audio_chunk_duration}"}
+  },
+  {
+   key: "audio_chunk_size_scale_factor", 
+   value: {string_value:"${audio_chunk_size_scale_factor}"}
+  },
+  {
+   key: "max_audio_chunk_duration", 
+   value: {string_value:"${max_audio_chunk_duration}"}
+  },
+  {
+   key: "audio_chunk_overlap_duration", 
+   value: {string_value:"${audio_chunk_overlap_duration}"}
+  },
+  {
+   key: "audio_tokenizer_frame_rate", 
+   value: {string_value:"50"}
+  }
+]
+
+input [
+  {
+    name: "reference_wav"
+    data_type: TYPE_FP32
+    dims: [-1]
+  },
+  {
+    name: "reference_wav_len"
+    data_type: TYPE_INT32
+    dims: [1]
+  },
+  {
+    name: "reference_text"
+    data_type: TYPE_STRING
+    dims: [1]
+  },
+  {
+    name: "target_text"
+    data_type: TYPE_STRING
+    dims: [1]
+  }
+]
+output [
+  {
+    name: "waveform"
+    data_type: TYPE_FP32
+    dims: [ -1 ]
+  }
+]
+
+instance_group [
+  {
+    count: ${bls_instance_num}
+    kind: KIND_CPU
+  }
+]
