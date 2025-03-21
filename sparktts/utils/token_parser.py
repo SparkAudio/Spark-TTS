@@ -156,10 +156,11 @@ class TokenParser:
 
 # test
 if __name__ == "__main__":
+    import os
     from transformers import AutoTokenizer
 
     tokenizer = AutoTokenizer.from_pretrained(
-        "/aifs4su/xinshengwang/code/StyleCraft/tokenizer/stylecraft-bicodec-pitch-loudness-speed-emotion-tokenizer"
+        os.getenv("TOKENIZER_PATH", "/aifs4su/xinshengwang/code/StyleCraft/tokenizer/stylecraft-bicodec-pitch-loudness-speed-emotion-tokenizer")
     )
 
     tasks = ["tts", "tts", "understand", "controllable_tts", "prompt_tts"]
@@ -183,5 +184,7 @@ if __name__ == "__main__":
         inputs = [task, age, gender, mel, mel_level, loudness, loudness_level, emotion]
         inputs = "".join(inputs)
         ids = tokenizer.encode(inputs, add_special_tokens=False)
-        print(ids)
-        print("decode", tokenizer.decode(ids))
+        print("tokenized ids",ids)
+        tokens = tokenizer.decode(ids)
+        print("decoded tokens", tokens)
+        assert tokens == inputs

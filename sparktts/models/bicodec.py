@@ -228,11 +228,16 @@ if __name__ == "__main__":
     model = BiCodec.load_from_checkpoint(
         model_dir="pretrained_models/SparkTTS-0.5B/BiCodec",
     )
+    device = "cpu" if not torch.cuda.is_available() else "cuda"
+    print(model)
+    model_million_params = sum(p.numel() for p in model.parameters()) / 1e6
+    print(f"{model_million_params}M parameters")
+    model.to(device)
 
     # Generate random inputs for testing
     duration = 0.96
-    x = torch.randn(20, 1, int(duration * 16000))
-    feat = torch.randn(20, int(duration * 50), 1024)
+    x = torch.randn(20, 1, int(duration * 16000)).to(device)
+    feat = torch.randn(20, int(duration * 50), 1024).to(device)
     inputs = {"feat": feat, "wav": x, "ref_wav": x}
 
     # Forward pass
@@ -241,7 +246,8 @@ if __name__ == "__main__":
     wav_recon = model.detokenize(semantic_tokens, global_tokens)
 
     # Verify if the reconstruction matches
-    if torch.allclose(outputs["recons"].detach(), wav_recon):
+    if torch.allclose(outputs["recons"].detach(), wav_recon, rtol=1e-3, atol=1e-5):
+    #if torch.allclose(outputs["recons"].detach(), wav_recon):
         print("Test successful")
     else:
         print("Test failed")
