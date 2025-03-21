@@ -172,6 +172,3 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
-
-# runtime
-triton_python_backend_utils.py

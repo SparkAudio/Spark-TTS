@@ -42,7 +42,9 @@ def parse_args():
         help="Directory to save generated audio files",
     )
     parser.add_argument("--device", type=int, default=0, help="CUDA device number")
-    parser.add_argument("--text", type=str, required=True, help="Text for TTS generation")
+    parser.add_argument(
+        "--text", type=str, required=True, help="Text for TTS generation"
+    )
     parser.add_argument("--prompt_text", type=str, help="Transcript of prompt audio")
     parser.add_argument(
         "--prompt_speech_path",
@@ -50,8 +52,12 @@ def parse_args():
         help="Path to the prompt audio file",
     )
     parser.add_argument("--gender", choices=["male", "female"])
-    parser.add_argument("--pitch", choices=["very_low", "low", "moderate", "high", "very_high"])
-    parser.add_argument("--speed", choices=["very_low", "low", "moderate", "high", "very_high"])
+    parser.add_argument(
+        "--pitch", choices=["very_low", "low", "moderate", "high", "very_high"]
+    )
+    parser.add_argument(
+        "--speed", choices=["very_low", "low", "moderate", "high", "very_high"]
+    )
     return parser.parse_args()
 
 
@@ -101,24 +107,10 @@ def run_tts(args):
     logging.info(f"Audio saved at: {save_path}")
 
 
-"""
-# Inference Overview of Controlled Generation
-PYTHONPATH=./ python cli/inference.py \
-    --text "身临其境，换新体验。塑造开源语音合成新范式，让智能语音更自然。" \
-    --save_dir "example/results" \
-    --model_dir ../../models/SparkAudio/Spark-TTS-0.5B \
-    --gender female --pitch  moderate --speed high
-
-# Inference Overview of Voice Cloning
-PYTHONPATH=./ python cli/inference.py \
-    --text "身临其境，换新体验。塑造开源语音合成新范式，让智能语音更自然。" \
-    --save_dir "example/results" \
-    --model_dir ../../models/SparkAudio/Spark-TTS-0.5B \
-    --prompt_text "吃燕窝就选燕之屋，本节目由26年专注高品质燕窝的燕之屋冠名播出。豆奶牛奶换着喝，营养更均衡，本节目由豆本豆豆奶特约播出。" \
-    --prompt_speech_path "example/prompt_audio.wav"
-"""
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    )
 
     args = parse_args()
     run_tts(args)

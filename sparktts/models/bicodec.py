@@ -17,6 +17,7 @@ import torch
 import torch.nn as nn
 from pathlib import Path
 from typing import Dict, Any
+from omegaconf import DictConfig
 from safetensors.torch import load_file
 
 from sparktts.utils.file import load_config
@@ -42,7 +43,7 @@ class BiCodec(nn.Module):
         speaker_encoder: nn.Module,
         prenet: nn.Module,
         postnet: nn.Module,
-        **kwargs,
+        **kwargs
     ) -> None:
         """
         Initializes the BiCodec model with the required components.
@@ -72,12 +73,12 @@ class BiCodec(nn.Module):
 
         Args:
             model_dir (Path): Path to the model directory containing checkpoint and config.
-
+        
         Returns:
             BiCodec: The initialized BiCodec model.
         """
-        ckpt_path = f"{model_dir}/model.safetensors"
-        config = load_config(f"{model_dir}/config.yaml")["audio_tokenizer"]
+        ckpt_path = f'{model_dir}/model.safetensors'
+        config = load_config(f'{model_dir}/config.yaml')['audio_tokenizer']
         mel_params = config["mel_params"]
         encoder = Encoder(**config["encoder"])
         quantizer = FactorizedVectorQuantize(**config["quantizer"])
@@ -115,7 +116,7 @@ class BiCodec(nn.Module):
 
         Args:
             batch (dict): A dictionary containing features, reference waveform, and target waveform.
-
+        
         Returns:
             dict: A dictionary containing the reconstruction, features, and other metrics.
         """
@@ -211,7 +212,6 @@ class BiCodec(nn.Module):
 
     def remove_weight_norm(self):
         """Removes weight normalization from all layers."""
-
         def _remove_weight_norm(m):
             try:
                 torch.nn.utils.remove_weight_norm(m)
@@ -223,20 +223,16 @@ class BiCodec(nn.Module):
 
 # Test the model
 if __name__ == "__main__":
+
     config = load_config("pretrained_models/SparkTTS-0.5B/BiCodec/config.yaml")
     model = BiCodec.load_from_checkpoint(
         model_dir="pretrained_models/SparkTTS-0.5B/BiCodec",
     )
-    device = "cpu" if not torch.cuda.is_available() else "cuda"
-    print(model)
-    model_million_params = sum(p.numel() for p in model.parameters()) / 1e6
-    print(f"{model_million_params}M parameters")
-    model.to(device)
 
     # Generate random inputs for testing
     duration = 0.96
-    x = torch.randn(20, 1, int(duration * 16000)).to(device)
-    feat = torch.randn(20, int(duration * 50), 1024).to(device)
+    x = torch.randn(20, 1, int(duration * 16000))
+    feat = torch.randn(20, int(duration * 50), 1024)
     inputs = {"feat": feat, "wav": x, "ref_wav": x}
 
     # Forward pass
@@ -245,8 +241,7 @@ if __name__ == "__main__":
     wav_recon = model.detokenize(semantic_tokens, global_tokens)
 
     # Verify if the reconstruction matches
-    if torch.allclose(outputs["recons"].detach(), wav_recon, rtol=1e-3, atol=1e-5):
-        # if torch.allclose(outputs["recons"].detach(), wav_recon):
+    if torch.allclose(outputs["recons"].detach(), wav_recon):
         print("Test successful")
     else:
         print("Test failed")
