@@ -11,3 +11,6 @@ torchaudio==2.5.1
 tqdm==4.66.5
 transformers==4.46.2
 gradio==5.18.0
+fastapi==0.115.11
+uvicorn==0.34.0
+python-dotenv==1.0.1
