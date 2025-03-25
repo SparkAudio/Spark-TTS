@@ -18,15 +18,15 @@
 
 import torch
 import torch.nn as nn
-from torch.nn.utils import weight_norm
+from torch.nn.utils import parametrizations
 
 
 def WNConv1d(*args, **kwargs):
-    return weight_norm(nn.Conv1d(*args, **kwargs))
+    return parametrizations.weight_norm(nn.Conv1d(*args, **kwargs))
 
 
 def WNConvTranspose1d(*args, **kwargs):
-    return weight_norm(nn.ConvTranspose1d(*args, **kwargs))
+    return parametrizations.weight_norm(nn.ConvTranspose1d(*args, **kwargs))
 
 
 # Scripting this brings model speed up 1.4x

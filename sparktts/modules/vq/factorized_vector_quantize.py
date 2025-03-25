@@ -22,11 +22,11 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from einops import rearrange
-from torch.nn.utils import weight_norm
+from torch.nn.utils import parametrizations
 
 
 def WNConv1d(*args, **kwargs):
-    return weight_norm(nn.Conv1d(*args, **kwargs))
+    return parametrizations.weight_norm(nn.Conv1d(*args, **kwargs))
 
 
 def ema_inplace(moving_avg, new, decay):

@@ -45,10 +45,21 @@ class SparkTTS:
 
     def _initialize_inference(self):
         """Initializes the tokenizer, model, and audio tokenizer for inference."""
-        self.tokenizer = AutoTokenizer.from_pretrained(f"{self.model_dir}/LLM")
-        self.model = AutoModelForCausalLM.from_pretrained(f"{self.model_dir}/LLM")
-        self.audio_tokenizer = BiCodecTokenizer(self.model_dir, device=self.device)
-        self.model.to(self.device)
+        try:
+            self.tokenizer = AutoTokenizer.from_pretrained(f"{self.model_dir}/LLM")
+            self.model = AutoModelForCausalLM.from_pretrained(f"{self.model_dir}/LLM")
+            self.audio_tokenizer = BiCodecTokenizer(self.model_dir, device=self.device)
+            self.model.to(self.device)
+            
+            # Set pad_token_id to eos_token_id for open-ended generation
+            self.model.config.pad_token_id = self.model.config.eos_token_id
+            
+        except Exception as e:
+            import traceback
+            error_msg = f"Failed to initialize Spark-TTS: {e}"
+            print(error_msg)
+            print(traceback.format_exc())
+            raise RuntimeError(error_msg)
 
     def process_prompt(
         self,
@@ -201,6 +212,7 @@ class SparkTTS:
             top_k=top_k,
             top_p=top_p,
             temperature=temperature,
+            pad_token_id=self.model.config.eos_token_id
         )
 
         # Trim the output tokens to remove the input tokens

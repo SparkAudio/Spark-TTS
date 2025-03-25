@@ -28,8 +28,8 @@ def callback(user_data, result, error):
 def tts(
     server_url: str = "localhost:8000",
     reference_audio: str = "/prompt_audio.wav",
-    reference_text: str = "吃燕窝就选燕之屋，本节目由26年专注高品质燕窝的燕之屋冠名播出。豆奶牛奶换着喝，营养更均衡，本节目由豆本豆豆奶特约播出。",
-    target_text: str = "身临其境，换新体验。塑造开源语音合成新范式，让智能语音更自然。",
+    reference_text: str = "Welcome to Spark TTS. This is a reference voice sample for high-quality voice cloning technology. Natural and expressive speech synthesis is now possible.",
+    target_text: str = "Immersive experience with a new paradigm. Creating an open-source speech synthesis standard for more natural intelligent speech.",
     model_name: str = "spark_tts_decoupled",
     output_audio: str = "grpc_output.wav",
     verbose: bool = False,
@@ -187,14 +187,14 @@ def get_args():
     parser.add_argument(
         "--reference-text",
         type=str,
-        default="吃燕窝就选燕之屋，本节目由26年专注高品质燕窝的燕之屋冠名播出。豆奶牛奶换着喝，营养更均衡，本节目由豆本豆豆奶特约播出。",
+        default="Welcome to Spark TTS. This is a reference voice sample for high-quality voice cloning technology. Natural and expressive speech synthesis is now possible.",
         help="",
     )
 
     parser.add_argument(
         "--target-text",
         type=str,
-        default="身临其境，换新体验。塑造开源语音合成新范式，让智能语音更自然。",
+        default="Immersive experience with a new paradigm. Creating an open-source speech synthesis standard for more natural intelligent speech.",
         help="",
     )
 
@@ -234,8 +234,8 @@ def get_args():
 python runtime/triton_trtllm/client_grpc_stream.py \
     --server-url r15.modal.host:33585 \
     --reference-audio example/prompt_audio.wav \
-    --reference-text "吃燕窝就选燕之屋，本节目由26年专注高品质燕窝的燕之屋冠名播出。豆奶牛奶换着喝，营养更均衡，本节目由豆本豆豆奶特约播出。" \
-    --target-text "身临其境，换新体验。塑造开源语音合成新范式，让智能语音更自然。" \
+    --reference-text "Welcome to Spark TTS. This is a reference voice sample for high-quality voice cloning technology." \
+    --target-text "Immersive experience with a new paradigm. Creating an open-source speech synthesis standard." \
     --model-name spark_tts_decoupled \
     --output-audio output.wav
 """

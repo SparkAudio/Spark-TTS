@@ -18,7 +18,7 @@ import torch
 import torch.nn as nn
 
 from typing import Tuple
-from torch.nn.utils import weight_norm, remove_weight_norm
+from torch.nn.utils import parametrizations
 
 from typing import Optional
 
@@ -138,7 +138,7 @@ class ResBlock1(nn.Module):
         self.lrelu_slope = lrelu_slope
         self.convs1 = nn.ModuleList(
             [
-                weight_norm(
+                parametrizations.weight_norm(
                     nn.Conv1d(
                         dim,
                         dim,
@@ -148,7 +148,7 @@ class ResBlock1(nn.Module):
                         padding=self.get_padding(kernel_size, dilation[0]),
                     )
                 ),
-                weight_norm(
+                parametrizations.weight_norm(
                     nn.Conv1d(
                         dim,
                         dim,
@@ -158,7 +158,7 @@ class ResBlock1(nn.Module):
                         padding=self.get_padding(kernel_size, dilation[1]),
                     )
                 ),
-                weight_norm(
+                parametrizations.weight_norm(
                     nn.Conv1d(
                         dim,
                         dim,
@@ -173,7 +173,7 @@ class ResBlock1(nn.Module):
 
         self.convs2 = nn.ModuleList(
             [
-                weight_norm(
+                parametrizations.weight_norm(
                     nn.Conv1d(
                         dim,
                         dim,
@@ -183,7 +183,7 @@ class ResBlock1(nn.Module):
                         padding=self.get_padding(kernel_size, 1),
                     )
                 ),
-                weight_norm(
+                parametrizations.weight_norm(
                     nn.Conv1d(
                         dim,
                         dim,
@@ -193,7 +193,7 @@ class ResBlock1(nn.Module):
                         padding=self.get_padding(kernel_size, 1),
                     )
                 ),
-                weight_norm(
+                parametrizations.weight_norm(
                     nn.Conv1d(
                         dim,
                         dim,
@@ -245,9 +245,9 @@ class ResBlock1(nn.Module):
 
     def remove_weight_norm(self):
         for l in self.convs1:
-            remove_weight_norm(l)
+            parametrizations.remove_weight_norm(l)
         for l in self.convs2:
-            remove_weight_norm(l)
+            parametrizations.remove_weight_norm(l)
 
     @staticmethod
     def get_padding(kernel_size: int, dilation: int = 1) -> int:
@@ -355,7 +355,7 @@ class VocosResNetBackbone(Backbone):
     ):
         super().__init__()
         self.input_channels = input_channels
-        self.embed = weight_norm(
+        self.embed = parametrizations.weight_norm(
             nn.Conv1d(input_channels, dim, kernel_size=3, padding=1)
         )
         layer_scale_init_value = layer_scale_init_value or 1 / num_blocks / 3

@@ -211,13 +211,22 @@ class BiCodec(nn.Module):
         )
 
     def remove_weight_norm(self):
-        """Removes weight normalization from all layers."""
+        """Remove weight normalization module from all of the layers."""
+        
         def _remove_weight_norm(m):
             try:
-                torch.nn.utils.remove_weight_norm(m)
-            except ValueError:
-                pass  # The module didn't have weight norm
-
+                # Try both import paths for backward compatibility
+                try:
+                    from torch.nn.utils import parametrizations
+                    parametrizations.remove_weight_norm(m)
+                except (ImportError, AttributeError):
+                    # Fall back to traditional weight_norm if needed
+                    from torch.nn.utils import remove_weight_norm
+                    remove_weight_norm(m)
+            except (ValueError, AttributeError):
+                # Skip if module doesn't have weight norm applied
+                pass
+            
         self.apply(_remove_weight_norm)
 
 
