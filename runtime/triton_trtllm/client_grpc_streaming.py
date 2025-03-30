@@ -85,10 +85,11 @@ def tts(
         if i == 0:
             new_audio = audio[:-cross_fade_samples]
         else:
-            cross_faded_overlap = audio[:cross_fade_samples] * fade_in + audios[i - 1][-cross_fade_samples:] * fade_out
+            cross_faded_overlap = audios[i - 1][-cross_fade_samples:] * fade_out + audio[:cross_fade_samples] * fade_in
             new_audio = np.concatenate([new_audio, cross_faded_overlap, audio[cross_fade_samples:-cross_fade_samples]])
     new_audio = np.concatenate([new_audio, audio[-cross_fade_samples:]])
 
+    #new_audio = np.hstack(audios)
     sf.write(output_audio, new_audio, 16000, "PCM_16")
     print(f"save audio to {output_audio}")
 
