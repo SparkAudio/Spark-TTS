@@ -165,7 +165,7 @@ class BiCodec(nn.Module):
         semantic_tokens = self.quantizer.tokenize(z)
         global_tokens = self.speaker_encoder.tokenize(mel.transpose(1, 2))
 
-        return semantic_tokens, global_tokens
+        return semantic_tokens.detach(), global_tokens.detach()
 
     @torch.no_grad()
     def detokenize(self, semantic_tokens, global_tokens):
@@ -185,7 +185,7 @@ class BiCodec(nn.Module):
         x = x + d_vector.unsqueeze(-1)
         wav_recon = self.decoder(x)
 
-        return wav_recon
+        return wav_recon.detach()
 
     def init_mel_transformer(self, config: Dict[str, Any]):
         """
