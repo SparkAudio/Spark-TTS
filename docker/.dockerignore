@@ -1,0 +1,26 @@
+# 忽略git文件
+.git
+.gitignore
+.github
+
+# 忽略预训练模型(通过volume映射)
+pretrained_models/*
+
+# 忽略结果目录
+example/results/*
+
+# 忽略临时文件
+**/__pycache__
+**/*.pyc
+**/.DS_Store
+
+# 忽略文档
+README.md
+LICENSE
+*.md
+
+# 忽略src目录
+src/
+
+# 忽略docker目录
+docker/
