@@ -142,6 +142,69 @@ For additional CLI and Web UI methods, including alternative implementations and
 
 - [CLI and UI by AcTePuKc](https://github.com/SparkAudio/Spark-TTS/issues/10)
 
+**API Service**
+
+Spark-TTS provides a FastAPI-based web API service for seamless integration with other applications.
+
+1. **Running the API service in conda environment**:
+   ```sh
+   # Make sure you're in the Spark-TTS conda environment
+   conda activate sparktts
+   
+   # Execute from the project root directory
+   ./api/run_api.sh
+   ```
+   The API will be available at http://localhost:7860 by default.
+
+2. **Docker support**:
+   You can build and run the Spark-TTS API using the provided build script:
+   ```sh
+   # Build Docker images (both full and lite versions)
+   chmod +x docker_builder.sh
+   ./docker_builder.sh
+   
+   # Run the API service in the background
+   docker compose up -d api
+   # OR for the lite version with mounted models
+   docker compose up -d api-lite
+   
+   # Run the WebUI service in the background
+   docker compose up -d webui
+   # OR for the lite version with mounted models
+   docker compose up -d webui-lite
+   
+   # To check running containers
+   docker compose ps
+   
+   # To stop services
+   docker compose down
+   ```
+   
+   > **Note**: If you encounter YAML errors like `mapping key "<<" already defined`, it might be due to compatibility issues with YAML merge keys in your Docker Compose version. You can either:
+   > 1. Update Docker to the latest version
+   > 2. Modify the docker-compose.yml file to use a different syntax for environment variable inheritance
+   > 3. Use the Docker CLI directly: `docker run -p 7860:7860 --gpus all spark-tts:latest-full`
+   
+   For more customization options, see the environment variables in the docker-compose.yml file.
+
+3. **Client Example**:
+   The repository includes an example client script that demonstrates how to interact with the API:
+   ```sh
+   # Note: The example client requires librosa, which is not in requirements.txt
+   pip install librosa
+   
+   # Basic usage
+   python api/example_client.py --text "Text to synthesize"
+   
+   # Voice cloning with reference audio
+   python api/example_client.py --text "This is voice cloning" --prompt_audio example/prompt_audio.wav
+   
+   # Voice creation with parameters
+   python api/example_client.py --text "This is voice creation" --gender female --pitch high --speed moderate
+   ```
+
+For more detailed information about the API service, including all available endpoints and parameters, please refer to the [API README](api/README.md).
+
 
 ## Runtime
 

@@ -1,0 +1,75 @@
+# Git
+.git
+.github
+.gitignore
+.gitattributes
+
+# Docker
+.dockerignore
+Dockerfile
+docker-compose.yml
+docker_builder.sh
+
+# CI/CD and development files
+.circleci/
+.travis.yml
+.env
+*.md
+!README.md
+!LICENSE
+docs/
+tests/
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env/
+.python-version
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+.eggs/
+*.egg-info/
+*.egg
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+*.log
+
+# API outputs (these should be created at runtime)
+api/outputs/
+
+# Local model directories (only include if specified)
+# Uncomment if you never want to include models
+# pretrained_models/
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+*.ipynb
+
+# Large unnecessary files
+*.wav
+*.wav.zip
+*.mp3
+*.mp4
+*.tar.gz
+output/ 

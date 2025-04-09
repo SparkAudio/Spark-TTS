@@ -1,0 +1,142 @@
+name: 'Spark-TTS'
+
+# Spark-TTS Docker Compose Configuration
+# This file provides different service configurations for Spark-TTS
+
+# === Environment Variables ===
+x-spark-tts-env: &spark-tts-env
+  # Service type - will be overridden for each service
+  SERVICE_TYPE: api
+  
+  # === Service Configuration ===
+  # API service listening port
+  SPARK_TTS_API_PORT: 7860
+  
+  # API service host address
+  SPARK_TTS_API_HOST: 0.0.0.0
+  
+  # Enable debug mode
+  SPARK_TTS_API_DEBUG: False
+  
+  # === Security Configuration ===
+  # Request header name for API key
+  # SPARK_TTS_API_KEY_NAME: X-SPARKTTS-API-KEY
+  
+  # API key (authentication disabled if not set)
+  # SPARK_TTS_API_KEY: your_secret_api_key
+  
+  # === TTS Model Configuration ===
+  # Model directory path
+  # SPARK_TTS_MODEL_DIR: pretrained_models/Spark-TTS-0.5B
+  
+  # GPU device ID
+  # Options: cpu (CPU inference), gpu (default GPU), gpu:N (specific GPU where N is device ID)
+  # SPARK_TTS_DEVICE: gpu:0
+  
+  # === Default Prompt Configuration ===
+  # Default reference text
+  # SPARK_TTS_DEFAULT_PROMPT_TEXT: 吃燕窝就选燕之屋，本节目由26年专注高品质燕窝的燕之屋冠名播出。
+  
+  # Default reference audio path
+  # SPARK_TTS_DEFAULT_PROMPT_SPEECH: example/prompt_audio.wav
+  
+  # === Output Configuration ===
+  # Output audio file directory
+  # SPARK_TTS_OUTPUT_DIR: api/outputs
+  
+  # Output audio URL prefix
+  # SPARK_TTS_OUTPUT_URL_PREFIX: /outputs
+  
+  # === Cleanup Configuration ===
+  # Cleanup task interval (seconds)
+  # SPARK_TTS_CLEANUP_INTERVAL: 3600
+  
+  # File expiration time (seconds)
+  # SPARK_TTS_FILE_EXPIRY_TIME: 86400
+
+# === Usage Instructions ===
+# 
+# Start API with models included:
+# docker compose up -d api
+#
+# Start API with mounted models:
+# docker compose up -d api-lite
+#
+# Start WebUI with models included:
+# docker compose up -d webui
+#
+# Start WebUI with mounted models:
+# docker compose up -d webui-lite
+#
+
+services:
+  # API service with full image (includes models)
+  api:
+    image: spark-tts:latest-full
+    environment:
+      <<: *spark-tts-env
+      SERVICE_TYPE: api
+    ports:
+      - "7860:7860"
+    volumes:
+      - ./api_output:/app/api/outputs
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # API service with lite image (mount models)
+  api-lite:
+    image: spark-tts:latest-lite
+    environment:
+      <<: *spark-tts-env
+      SERVICE_TYPE: api
+    ports:
+      - "7860:7860"
+    volumes:
+      - ./pretrained_models:/app/pretrained_models
+      - ./api_output:/app/api/outputs
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # WebUI service with full image (includes models)
+  webui:
+    image: spark-tts:latest-full
+    environment:
+      <<: *spark-tts-env
+      SERVICE_TYPE: webui
+    ports:
+      - "7860:7860"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  # WebUI service with lite image (mount models)
+  webui-lite:
+    image: spark-tts:latest-lite
+    environment:
+      <<: *spark-tts-env
+      SERVICE_TYPE: webui
+    ports:
+      - "7860:7860"
+    volumes:
+      - ./pretrained_models:/app/pretrained_models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
