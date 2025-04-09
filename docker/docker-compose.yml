@@ -1,0 +1,23 @@
+version: '3'
+
+services:
+  spark-tts:
+    container_name: Spark-TTS
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "12370:7860"
+    volumes:
+      # 模型数据持久化
+      - ../pretrained_models:/app/pretrained_models
+      # 输出结果持久化
+      - ../example/results:/app/example/results
+    # 如果不需要GPU支持，请注释掉以下所有配置
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
