@@ -206,7 +206,7 @@ def get_args():
         "--model-name",
         type=str,
         default="f5_tts",
-        choices=["f5_tts", "spark_tts", "spark_tts_decoupled"],
+        choices=["f5_tts", "spark_tts"],
         help="triton model_repo module name to request: transducer for k2, attention_rescoring for wenet offline, streaming_wenet for wenet streaming, infer_pipeline for paraformer large offline",
     )
 

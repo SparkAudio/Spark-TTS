@@ -25,6 +25,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import json
+import math
 import os
 import re
 from typing import Dict, List, Tuple, Optional, Union
@@ -110,15 +111,30 @@ class TritonPythonModel:
         Args:
             args: Dictionary containing model configuration
         """
+        self.logger = pb_utils.Logger
         # Parse model parameters
-        parameters = json.loads(args['model_config'])['parameters']
+        self.model_config = json.loads(args['model_config'])
+        parameters = self.model_config['parameters']
         model_params = {k: v["string_value"] for k, v in parameters.items()}
-        
+        self.logger.log_info(f"model_params:{model_params}")
+        # streaming TTS parameters
+        assert (
+            float(model_params["audio_chunk_duration"]) >= 0.5
+        ), f"audio_chunk_duration at least 0.5 seconds"
+        self.audio_chunk_duration = float(model_params["audio_chunk_duration"])
+        self.max_audio_chunk_duration = float(model_params["max_audio_chunk_duration"])
+        assert (
+            float(model_params["audio_chunk_size_scale_factor"]) >= 1.0
+        ), "audio_chunk_size_scale_factor should be greater than 1, change it according to your actual rtf"
+        self.audio_chunk_size_scale_factor = float(model_params["audio_chunk_size_scale_factor"])  # scale speed
+        self.audio_chunk_overlap_duration = float(model_params["audio_chunk_overlap_duration"])
+        self.audio_tokenizer_frame_rate = int(model_params["audio_tokenizer_frame_rate"])
+
         # Initialize tokenizer
         llm_tokenizer_dir = model_params["llm_tokenizer_dir"]
         self.tokenizer = AutoTokenizer.from_pretrained(llm_tokenizer_dir)
         self.device = torch.device("cuda")
-        self.decoupled = False
+        self.decoupled = pb_utils.using_decoupled_model_transaction_policy(self.model_config)
 
     def forward_llm(self, input_ids):
         """
@@ -172,21 +188,38 @@ class TritonPythonModel:
             inputs=input_tensor_list,
         )
         
-        llm_response = llm_request.exec(decoupled=self.decoupled)
-        if llm_response.has_error():
-            raise pb_utils.TritonModelException(llm_response.error().message())
-        
-        # Extract and process output
-        output_ids = pb_utils.get_output_tensor_by_name(
-            llm_response, "output_ids").as_numpy()
-        seq_lens = pb_utils.get_output_tensor_by_name(
-            llm_response, "sequence_length").as_numpy()
-        
-        # Get actual output IDs up to the sequence length
-        actual_output_ids = output_ids[0][0][:seq_lens[0][0]]
-        
-        return actual_output_ids
-
+        llm_responses = llm_request.exec(decoupled=self.decoupled)
+        if self.decoupled:
+            for llm_response in llm_responses:
+                if llm_response.has_error():
+                    raise pb_utils.TritonModelException(llm_response.error().message())
+                
+                # Extract and process output
+                output_ids = pb_utils.get_output_tensor_by_name(
+                    llm_response, "output_ids").as_numpy()
+                seq_lens = pb_utils.get_output_tensor_by_name(
+                    llm_response, "sequence_length").as_numpy()
+                
+                # Get actual output IDs up to the sequence length
+                actual_output_ids = output_ids[0][0][:seq_lens[0][0]]
+                
+                yield actual_output_ids
+        else:
+            llm_response = llm_responses
+            if llm_response.has_error():
+                raise pb_utils.TritonModelException(llm_response.error().message())
+            
+            # Extract and process output
+            output_ids = pb_utils.get_output_tensor_by_name(
+                llm_response, "output_ids").as_numpy()
+            seq_lens = pb_utils.get_output_tensor_by_name(
+                llm_response, "sequence_length").as_numpy()
+            
+            # Get actual output IDs up to the sequence length
+            actual_output_ids = output_ids[0][0][:seq_lens[0][0]]
+            
+            yield actual_output_ids    
+                
     def forward_audio_tokenizer(self, wav, wav_len):
         """Forward pass through the audio tokenizer component.
         
@@ -246,7 +279,29 @@ class TritonPythonModel:
         waveform = torch.utils.dlpack.from_dlpack(waveform.to_dlpack()).cpu()
         
         return waveform
-        
+    
+    def token2wav(self, generated_token_ids, global_token_ids):
+        # Decode and extract semantic token IDs from generated text
+        predicted_text = self.tokenizer.batch_decode(
+            [generated_token_ids],
+            skip_special_tokens=True,
+        )[0]
+        pred_semantic_ids = (
+            torch.tensor(
+                [int(token) for token in re.findall(r"bicodec_semantic_(\d+)", predicted_text)]
+            )
+            .unsqueeze(0)
+            .to(torch.int32)
+        )
+
+        # Generate audio with vocoder
+        audio = self.forward_vocoder(
+            global_token_ids.to(self.device),
+            pred_semantic_ids.to(self.device),
+        )
+
+        return audio
+
     def execute(self, requests):
         """Execute inference on the batched requests.
         
@@ -287,25 +342,63 @@ class TritonPythonModel:
             input_ids = model_inputs.input_ids.to(torch.int32)
             
             # Generate semantic tokens with LLM
-            generated_ids = self.forward_llm(input_ids)
-            
-            # Decode and extract semantic token IDs from generated text
-            predicted_text = self.tokenizer.batch_decode([generated_ids], skip_special_tokens=True)[0]
-            pred_semantic_ids = (
-                torch.tensor([int(token) for token in re.findall(r"bicodec_semantic_(\d+)", predicted_text)])
-                .unsqueeze(0).to(torch.int32)
-            )
-            
+            generated_ids_iter = self.forward_llm(input_ids)
 
-            # Generate audio with vocoder
-            audio = self.forward_vocoder(
-                global_token_ids.to(self.device),
-                pred_semantic_ids.to(self.device),
-            )
+            if self.decoupled:
+                response_sender = request.get_response_sender()
+                request_id = request.request_id()
+                semantic_token_ids_arr = []
+                max_chunk_size = math.ceil(self.max_audio_chunk_duration * self.audio_tokenizer_frame_rate)
+                chunk_size = math.ceil(self.audio_chunk_duration * self.audio_tokenizer_frame_rate)
+                overlap_chunk_size = math.ceil(self.audio_chunk_overlap_duration * self.audio_tokenizer_frame_rate)
+                self.logger.log_info(
+                    f"[{request_id}] init chunk_size: {chunk_size} max_chunk_size: {max_chunk_size}"
+                )
+                for generated_ids in generated_ids_iter:
+                    if generated_ids is None or len(generated_ids) == 0:
+                        break
+
+                    semantic_token_ids_arr.append(generated_ids)
+                    if len(semantic_token_ids_arr) >= chunk_size:
+                        chunk = semantic_token_ids_arr[:chunk_size]
+                        generated_semantic_token_ids = np.hstack(chunk)
+                        # Process each chunk
+                        sub_tts_speech = self.token2wav(generated_semantic_token_ids, global_token_ids)
+                        # Prepare response to send
+                        audio_tensor = pb_utils.Tensor.from_dlpack("waveform", to_dlpack(sub_tts_speech))
+                        inference_response = pb_utils.InferenceResponse(output_tensors=[audio_tensor])
+                        response_sender.send(inference_response)
+
+                        semantic_token_ids_arr = semantic_token_ids_arr[chunk_size - overlap_chunk_size:]
+                        # increase chunk size for better speech quality
+                        chunk_size = min(max_chunk_size, int(chunk_size * self.audio_chunk_size_scale_factor))
+                        self.logger.log_info(f"[{request_id}] increase chunk_size: {chunk_size}")
+
+                if len(semantic_token_ids_arr) > 0:  # end to finalize
+                    generated_semantic_token_ids = np.hstack(semantic_token_ids_arr)
+                    # Process each chunk
+                    sub_tts_speech = self.token2wav(generated_semantic_token_ids, global_token_ids)
+                    # Prepare response to send
+                    audio_tensor = pb_utils.Tensor.from_dlpack("waveform", to_dlpack(sub_tts_speech))
+                    inference_response = pb_utils.InferenceResponse(output_tensors=[audio_tensor])
+                    response_sender.send(inference_response)
+                    self.logger.log_info(f"[{request_id}] last chunk len: {len(semantic_token_ids_arr)}")
+            else:
+                generated_ids = next(generated_ids_iter)
+                if generated_ids is None or len(generated_ids) == 0:
+                    raise pb_utils.TritonModelException("Generated IDs is None or empty")
+
+                audio = self.token2wav(generated_ids, global_token_ids)
+                
+                # Prepare response
+                audio_tensor = pb_utils.Tensor.from_dlpack("waveform", to_dlpack(audio))
+                inference_response = pb_utils.InferenceResponse(output_tensors=[audio_tensor])
+                responses.append(inference_response)
             
-            # Prepare response
-            audio_tensor = pb_utils.Tensor.from_dlpack("waveform", to_dlpack(audio))
-            inference_response = pb_utils.InferenceResponse(output_tensors=[audio_tensor])
-            responses.append(inference_response)
-                             
-        return responses
+            if self.decoupled:
+                response_sender.send(flags=pb_utils.TRITONSERVER_RESPONSE_COMPLETE_FINAL)
+                self.logger.log_info(f"send tritonserver_response_complete_final to end")
+        
+        if not self.decoupled:
+            return responses
+
