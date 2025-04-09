@@ -46,9 +46,7 @@ def audio_volume_normalize(audio: np.ndarray, coeff: float = 0.2) -> np.ndarray:
 
     # If the maximum value is less than 0.1, scale the array to have a maximum of 0.1
     if temp[-1] < 0.1:
-        scaling_factor = max(
-            temp[-1], 1e-3
-        )  # Prevent division by zero with a small constant
+        scaling_factor = max(temp[-1], 1e-3)  # Prevent division by zero with a small constant
         audio = audio / scaling_factor * 0.1
 
     # Filter out values less than 0.01 from temp
@@ -168,9 +166,7 @@ def stft(
         Tensor: Magnitude spectrogram (B, #frames, fft_size // 2 + 1).
     """
 
-    x_stft = torch.stft(
-        x, fft_size, hop_size, win_length, window.to(x.device), return_complex=True
-    )
+    x_stft = torch.stft(x, fft_size, hop_size, win_length, window.to(x.device), return_complex=True)
 
     # clamp is needed to avoid nan or inf
     if not use_complex:
@@ -188,71 +184,62 @@ def detect_speech_boundaries(
     sample_rate: int,
     window_duration: float = 0.1,
     energy_threshold: float = 0.01,
-    margin_factor: int = 2
+    margin_factor: int = 2,
 ) -> Tuple[int, int]:
     """Detect the start and end points of speech in an audio signal using RMS energy.
-    
+
     Args:
         wav: Input audio signal array with values in [-1, 1]
         sample_rate: Audio sample rate in Hz
         window_duration: Duration of detection window in seconds
         energy_threshold: RMS energy threshold for speech detection
         margin_factor: Factor to determine extra margin around detected boundaries
-        
+
     Returns:
         tuple: (start_index, end_index) of speech segment
-        
+
     Raises:
         ValueError: If the audio contains only silence
     """
     window_size = int(window_duration * sample_rate)
     margin = margin_factor * window_size
     step_size = window_size // 10
-    
+
     # Create sliding windows using stride tricks to avoid loops
     windows = sliding_window_view(wav, window_size)[::step_size]
-    
+
     # Calculate RMS energy for each window
-    energy = np.sqrt(np.mean(windows ** 2, axis=1))
+    energy = np.sqrt(np.mean(windows**2, axis=1))
     speech_mask = energy >= energy_threshold
-    
+
     if not np.any(speech_mask):
         raise ValueError("No speech detected in audio (only silence)")
-    
+
     start = max(0, np.argmax(speech_mask) * step_size - margin)
     end = min(len(wav), (len(speech_mask) - 1 - np.argmax(speech_mask[::-1])) * step_size + margin)
-    
+
     return start, end
 
 
 def remove_silence_on_both_ends(
-    wav: np.ndarray,
-    sample_rate: int,
-    window_duration: float = 0.1,
-    volume_threshold: float = 0.01
+    wav: np.ndarray, sample_rate: int, window_duration: float = 0.1, volume_threshold: float = 0.01
 ) -> np.ndarray:
     """Remove silence from both ends of an audio signal.
-    
+
     Args:
         wav: Input audio signal array
         sample_rate: Audio sample rate in Hz
         window_duration: Duration of detection window in seconds
         volume_threshold: Amplitude threshold for silence detection
-        
+
     Returns:
         np.ndarray: Audio signal with silence removed from both ends
-        
+
     Raises:
         ValueError: If the audio contains only silence
     """
-    start, end = detect_speech_boundaries(
-        wav,
-        sample_rate,
-        window_duration,
-        volume_threshold
-    )
+    start, end = detect_speech_boundaries(wav, sample_rate, window_duration, volume_threshold)
     return wav[start:end]
-
 
 
 def hertz_to_mel(pitch: float) -> float:
@@ -269,3 +256,34 @@ def hertz_to_mel(pitch: float) -> float:
     """
     mel = 2595 * np.log10(1 + pitch / 700)
     return mel
+
+
+def merge_numpy_darray(sub_arrays: list[np.ndarray]) -> np.ndarray | None:
+    """
+    Merges a list of NumPy arrays into a single NumPy array.
+    This function is designed to handle arrays that represent audio
+    waveforms, where each array has shape (num_channels, sequence_length)
+    but may have different lengths along the sequence_length dimension.
+
+    Args:
+        sub_arrays: A list of NumPy arrays. [1d array, 1d array, ...]
+
+    Returns:
+        A single NumPy array with all the sub-arrays concatenated along
+        the sequence_length (time) dimension.
+        Returns None if the input list is empty or if the arrays have
+        inconsistent shapes (different number of channels).
+    """
+    if not sub_arrays:
+        return None
+
+    total_length = sum(arr.shape[0] for arr in sub_arrays)
+    dtype = sub_arrays[0].dtype
+    merged_array = np.empty((total_length), dtype=dtype)
+    current_position = 0
+
+    for arr in sub_arrays:
+        merged_array[current_position : current_position + arr.shape[0]] = arr
+        current_position += arr.shape[0]
+
+    return merged_array
