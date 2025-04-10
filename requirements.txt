@@ -10,4 +10,4 @@ torch==2.5.1
 torchaudio==2.5.1
 tqdm==4.66.5
 transformers==4.46.2
-gradio==5.18.0
+gradio==5.23.1 
