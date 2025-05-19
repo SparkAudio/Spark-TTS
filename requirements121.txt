@@ -1,3 +1,4 @@
+--extra-index-url https://download.pytorch.org/whl/cu121
 einops==0.8.1
 einx==0.3.0
 numpy==2.2.3
@@ -6,8 +7,8 @@ packaging==24.2
 safetensors==0.5.2
 soundfile==0.12.1
 soxr==0.5.0.post1
-torch==2.5.1
-torchaudio==2.5.1
+torch==2.5.1+cu121
+torchaudio==2.5.1+cu121
 tqdm==4.66.5
 transformers==4.46.2
 gradio==5.18.0

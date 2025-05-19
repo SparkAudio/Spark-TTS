@@ -1,0 +1,5 @@
+text=An immersive, new experience. Shaping the new paradigm of open source speech synthesis for more natural intelligent speech.
+prompt_text=
+prompt_speech_path=example/prompt_audio.wav
+
+model_dir=pretrained_models/Spark-TTS-0.5B
