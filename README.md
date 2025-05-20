@@ -3,10 +3,6 @@
     Spark-TTS
     </h1>
     <p>
-    Official PyTorch code for inference of <br>
-    <b><em>Spark-TTS: An Efficient LLM-Based Text-to-Speech Model with Single-Stream Decoupled Speech Tokens</em></b>
-    </p>
-    <p>
     <img src="src/logo/SparkTTS.jpg" alt="Spark-TTS Logo" style="width: 200px; height: 200px;">
     </p>
         <p>
@@ -33,135 +29,93 @@
 
 ## Spark-TTS 🔥
 
-### Overview
+### Описание
 
-Spark-TTS is an advanced text-to-speech system that uses the power of large language models (LLM) for highly accurate and natural-sounding voice synthesis. It is designed to be efficient, flexible, and powerful for both research and production use.
+Spark-TTS - это передовая система преобразования текста в речь, которая использует возможности больших языковых моделей (LLM) для высокоточного и естественного синтеза голоса. Она разработана как эффективная, гибкая и мощная система для использования как в научных исследованиях, так и в производстве.
 
-### Key Features
+### Основные преимущества
 
-- **Simplicity and Efficiency**: Built entirely on Qwen2.5, Spark-TTS eliminates the need for additional generation models like flow matching. Instead of relying on separate models to generate acoustic features, it directly reconstructs audio from the code predicted by the LLM. This approach streamlines the process, improving efficiency and reducing complexity.
-- **High-Quality Voice Cloning**: Supports zero-shot voice cloning, which means it can replicate a speaker's voice even without specific training data for that voice. This is ideal for cross-lingual and code-switching scenarios, allowing for seamless transitions between languages and voices without requiring separate training for each one.
-- **Bilingual Support**: Supports both Chinese and English, and is capable of zero-shot voice cloning for cross-lingual and code-switching scenarios, enabling the model to synthesize speech in multiple languages with high naturalness and accuracy.
-- **Controllable Speech Generation**: Supports creating virtual speakers by adjusting parameters such as gender, pitch, and speaking rate.
-
----
-
-<table align="center">
-  <tr>
-    <td align="center"><b>Inference Overview of Voice Cloning</b><br><img src="src/figures/infer_voice_cloning.png" width="80%" /></td>
-  </tr>
-  <tr>
-    <td align="center"><b>Inference Overview of Controlled Generation</b><br><img src="src/figures/infer_control.png" width="80%" /></td>
-  </tr>
-</table>
+- **Простота и эффективность**: Построенный полностью на Qwen2.5, Spark-TTS устраняет необходимость в дополнительных моделях генерации, таких как согласование потоков. Вместо того чтобы полагаться на отдельные модели для генерации акустических характеристик, он напрямую восстанавливает звук из кода, предсказанного LLM. Такой подход упрощает процесс, повышая эффективность и снижая сложность.
+- **Высококачественное клонирование голоса**: Поддерживает клонирование голоса с нулевым результатом, что означает, что он может воспроизвести голос диктора даже без специальных обучающих данных для этого голоса. Это идеально подходит для сценариев межъязыкового общения и переключения кодов, позволяя плавно переходить от одного языка к другому, не требуя отдельного обучения для каждого из них.
+- **Поддержка на двух языках**: Поддерживает китайский и английский языки и способен клонировать голос с нулевого выстрела для межъязыковых сценариев и сценариев с переключением кодов, что позволяет модели синтезировать речь на нескольких языках с высокой естественностью и точностью.
+- **Управляемая генерация речи**: Поддерживает создание виртуальных дикторов, настраивая такие параметры, как пол, высота тона и темп речи.
 
 
-## 🚀 News
+## Установка
+**Клонирование репозитория**
 
-- **[2025-03-04]** Our paper on this project has been published! You can read it here: [Spark-TTS](https://arxiv.org/pdf/2503.01710). 
-
-- **[2025-03-12]** Nvidia Triton Inference Serving is now supported. See the Runtime section below for more details.
-
-
-## Install
-**Clone and Install**
-
-  Here are instructions for installing on Linux. If you're on Windows, please refer to the [Windows Installation Guide](https://github.com/SparkAudio/Spark-TTS/issues/5).  
-*(Thanks to [@AcTePuKc](https://github.com/AcTePuKc) for the detailed Windows instructions!)*
+  Здесь приведены инструкции по установке с помощью [Docker](https://www.docker.com/). Другие варианты установки вы можете найти в [оффициальном репозитории](https://github.com/SparkAudio/Spark-TTS)
 
 
-- Clone the repo
+- Склонируйте репозиторий
 ``` sh
-git clone https://github.com/SparkAudio/Spark-TTS.git
+git clone https://github.com/Crocussys/Spark-TTS.git
 cd Spark-TTS
 ```
 
-- Install Conda: please see https://docs.conda.io/en/latest/miniconda.html
-- Create Conda env:
+**Скачивание модели**
 
-``` sh
-conda create -n sparktts -y python=3.12
-conda activate sparktts
-pip install -r requirements.txt
-# If you are in mainland China, you can set the mirror as follows:
-pip install -r requirements.txt -i https://mirrors.aliyun.com/pypi/simple/ --trusted-host=mirrors.aliyun.com
-```
-
-**Model Download**
-
-Download via python:
-```python
-from huggingface_hub import snapshot_download
-
-snapshot_download("SparkAudio/Spark-TTS-0.5B", local_dir="pretrained_models/Spark-TTS-0.5B")
-```
-
-Download via git clone:
 ```sh
 mkdir -p pretrained_models
 
-# Make sure you have git-lfs installed (https://git-lfs.com)
+# Убедитесь, что у вас установлен git-lfs (https://git-lfs.com)
 git lfs install
 
 git clone https://huggingface.co/SparkAudio/Spark-TTS-0.5B pretrained_models/Spark-TTS-0.5B
 ```
 
-**Basic Usage**
+**Используйте Docker**
 
-You can simply run the demo with the following commands:
-``` sh
-cd example
-bash infer.sh
-```
-
-Alternatively, you can directly execute the following command in the command line to perform inference：
+- Выполните сборку образа
 
 ``` sh
-python -m cli.inference \
-    --text "text to synthesis." \
-    --device 0 \
-    --save_dir "path/to/save/audio" \
-    --model_dir pretrained_models/Spark-TTS-0.5B \
-    --prompt_text "transcript of the prompt audio" \
-    --prompt_speech_path "path/to/prompt_audio"
+docker build -t spark-tts --build-arg cuda_version=<CUDA_VERSION> .
 ```
 
-**Web UI Usage**
+Замените <CUDA_VERSION> на 118 (Если хотите использовать CUDA версии 11.8), 121 (Для CUDA 12.1) или 124 (Для CUDA 12.4)
 
-You can start the UI interface by running `python webui.py --device 0`, which allows you to perform Voice Cloning and Voice Creation. Voice Cloning supports uploading reference audio or directly recording the audio.
+- Запустите контейнер с необходимыми параметрами
 
+``` sh
+docker run --rm --name spark-tts --gpus device=0 -v <YOUR_PATH>:/usr/src/app/example/results --env-file args.list spark-tts
+```
 
-| **Voice Cloning** | **Voice Creation** |
-|:-------------------:|:-------------------:|
-| ![Image 1](src/figures/gradio_TTS.png) | ![Image 2](src/figures/gradio_control.png) |
+Замените <YOUR_PATH> на путь до дерриктории, куда будет сохранён результат
 
+Вы также можете изменить аргументы запуска с помощью файла args.list
 
-**Optional Methods**
+Или можете указывать аргументы напрямую из командной строки, например:
+``` sh
+--env text="This text was generated with spark tts!"
+```
 
-For additional CLI and Web UI methods, including alternative implementations and extended functionalities, you can refer to:
+Таким образом ваша команда запуска может выглядить следующем образом
 
-- [CLI and UI by AcTePuKc](https://github.com/SparkAudio/Spark-TTS/issues/10)
+``` sh
+docker run --rm --name spark-tts --gpus device=0 -v С:\\path\\to\\work\\dir\\example\\results:/usr/src/app/example/results --env text="This text was generated with spark tts!" --env-file args.list spark-tts
+```
 
+Обратите внимание, что используется cuda device 0. Если вы хотите использовать иные или дополнительные устройства, измените аргумент --gpus и аргумент device в файле args.list
 
-## Runtime
+## Выполнение
 
-**Nvidia Triton Inference Serving**
+**Nvidia Triton**
 
-We now provide a reference for deploying Spark-TTS with Nvidia Triton and TensorRT-LLM. The table below presents benchmark results on a single L20 GPU, using 26 different prompt_audio/target_text pairs (totalling 169 seconds of audio):
+Теперь мы приводим пример развертывания Spark-TTS с Nvidia Triton и TensorRT-LLM. В таблице ниже представлены результаты бенчмарка на одном графическом процессоре L20 с использованием 26 различных пар prompt_audio/target_text (в общей сложности 169 секунд аудио):
 
-| Model | Note   | Concurrency | Avg Latency     | RTF | 
+| Модель | Заметки   | Количество потоков | Среднее время исполнения     | Коэффициент реального времени | 
 |-------|-----------|-----------------------|---------|--|
 | Spark-TTS-0.5B | [Code Commit](https://github.com/SparkAudio/Spark-TTS/tree/4d769ff782a868524f29e0be851ca64f8b22ebf1/runtime/triton_trtllm) | 1                   | 876.24 ms | 0.1362|
 | Spark-TTS-0.5B | [Code Commit](https://github.com/SparkAudio/Spark-TTS/tree/4d769ff782a868524f29e0be851ca64f8b22ebf1/runtime/triton_trtllm) | 2                   | 920.97 ms | 0.0737|
 | Spark-TTS-0.5B | [Code Commit](https://github.com/SparkAudio/Spark-TTS/tree/4d769ff782a868524f29e0be851ca64f8b22ebf1/runtime/triton_trtllm) | 4                   | 1611.51 ms | 0.0704|
 
 
-Please see the detailed instructions in [runtime/triton_trtllm/README.md](runtime/triton_trtllm/README.md ) for more information.
+Пожалуйста, ознакомьтесь с подробными инструкциями в [runtime/triton_trtllm/README.md](runtime/triton_trtllm/README.md ) для получения дополнительной информации.
 
 
-## **Demos**
+## **Примеры**
 
-Here are some demos generated by Spark-TTS using zero-shot voice cloning. For more demos, visit our [demo page](https://sparkaudio.github.io/spark-tts/).
+Вот несколько демонстрационных роликов, созданных Spark-TTS с помощью клонирования голоса с нулевого снимка. Для получения большего количества демонстраций посетите наш [сайт](https://sparkaudio.github.io/spark-tts/).
 
 ---
 
@@ -305,38 +259,16 @@ Here are some demos generated by Spark-TTS using zero-shot voice cloning. For mo
 </table>
 
 
-## To-Do List
+## ⚠️ Отказ от ответственности
 
-- [x] Release the Spark-TTS paper.
-- [ ] Release the training code.
-- [ ] Release the training dataset, VoxBox.
+Этот проект предоставляет модель TTS для клонирования голоса, предназначенную для академических исследований, образовательных целей и законных приложений, таких как персонализированный синтез речи, вспомогательные технологии и лингвистические исследования.
 
+Обратите внимание:
 
-## Citation
+- Не используйте эту модель для несанкционированного клонирования голоса, выдачи себя за другого человека, мошенничества, аферы, подделок или любой незаконной деятельности.
 
-```
-@misc{wang2025sparktts,
-      title={Spark-TTS: An Efficient LLM-Based Text-to-Speech Model with Single-Stream Decoupled Speech Tokens}, 
-      author={Xinsheng Wang and Mingqi Jiang and Ziyang Ma and Ziyu Zhang and Songxiang Liu and Linqin Li and Zheng Liang and Qixi Zheng and Rui Wang and Xiaoqin Feng and Weizhen Bian and Zhen Ye and Sitong Cheng and Ruibin Yuan and Zhixian Zhao and Xinfa Zhu and Jiahao Pan and Liumeng Xue and Pengcheng Zhu and Yunlin Chen and Zhifei Li and Xie Chen and Lei Xie and Yike Guo and Wei Xue},
-      year={2025},
-      eprint={2503.01710},
-      archivePrefix={arXiv},
-      primaryClass={cs.SD},
-      url={https://arxiv.org/abs/2503.01710}, 
-}
-```
+- Обеспечьте соблюдение местных законов и правил при использовании этой модели и придерживайтесь этических стандартов.
 
+- Разработчики не несут никакой ответственности за любое неправильное использование этой модели.
 
-## ⚠️ Usage Disclaimer
-
-This project provides a zero-shot voice cloning TTS model intended for academic research, educational purposes, and legitimate applications, such as personalized speech synthesis, assistive technologies, and linguistic research.
-
-Please note:
-
-- Do not use this model for unauthorized voice cloning, impersonation, fraud, scams, deepfakes, or any illegal activities.
-
-- Ensure compliance with local laws and regulations when using this model and uphold ethical standards.
-
-- The developers assume no liability for any misuse of this model.
-
-We advocate for the responsible development and use of AI and encourage the community to uphold safety and ethical principles in AI research and applications. If you have any concerns regarding ethics or misuse, please contact us.
+Мы выступаем за ответственное развитие и использование ИИ и призываем сообщество придерживаться принципов безопасности и этики при проведении исследований и применении ИИ. Если у вас есть какие-либо опасения по поводу этики или неправильного использования, пожалуйста, свяжитесь с нами.
