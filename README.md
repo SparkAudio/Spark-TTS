@@ -82,13 +82,21 @@ docker build -t spark-tts --build-arg cuda_version=<CUDA_VERSION> .
 
 Замените <CUDA_VERSION> на 118 (Если хотите использовать CUDA версии 11.8), 121 (Для CUDA 12.1) или 124 (Для CUDA 12.4)
 
+## Запуск
+
+**Запуск с вашими аргументами**
+
 - Запустите контейнер с необходимыми параметрами
 
 ``` sh
-docker run --rm --name spark-tts --gpus device=0 -v <YOUR_PATH>:/usr/src/app/example/results --env-file args.list spark-tts
+docker run --rm --name spark-tts --gpus device=0 -v <YOUR_PATH>:/usr/src/app/shared --env-file args.list spark-tts
 ```
 
-Замените <YOUR_PATH> на путь до дерриктории, куда будет сохранён результат
+Замените <YOUR_PATH> на полный путь до общей деректории, куда можно монтировать промты и куда будет сохранён результат. Лучше всего создать новую директрорию:
+
+```sh
+mkdir -p shared
+```
 
 Вы также можете изменить аргументы запуска с помощью файла args.list
 
@@ -100,10 +108,20 @@ docker run --rm --name spark-tts --gpus device=0 -v <YOUR_PATH>:/usr/src/app/exa
 Таким образом ваша команда запуска может выглядить следующем образом
 
 ``` sh
-docker run --rm --name spark-tts --gpus device=0 -v С:\\path\\to\\work\\dir\\example\\results:/usr/src/app/example/results --env text="This text was generated with spark tts!" --env-file args.list spark-tts
+docker run --rm --name spark-tts --gpus device=0 -v С:\\path\\to\\work\\dir\\shared:/usr/src/app/shared --env text="This text was generated with spark tts!" --env-file args.list spark-tts
 ```
 
-Обратите внимание, что используется cuda device 0. Если вы хотите использовать иные или дополнительные устройства, измените аргумент --gpus и аргумент device в файле args.list
+Обратите внимание, что используется cuda device 0. Если вы хотите использовать иные или дополнительные устройства, измените аргумент --gpus и аргумент device в файле docker_run.sh
+
+**Запуск теста**
+
+- Запустите контейнер с аргументом test
+
+``` sh
+docker run --rm --name spark-tts --gpus device=0 -v <WORK_DIR>\\tests\\test1:/usr/src/app/tests/test1 --env test=true spark-tts
+```
+
+Замените <WORK_DIR> на полный путь до деректории с проектом
 
 ## Выполнение
 

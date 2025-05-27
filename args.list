@@ -3,3 +3,4 @@ prompt_text=
 prompt_speech_path=example/prompt_audio.wav
 
 model_dir=pretrained_models/Spark-TTS-0.5B
+test=false

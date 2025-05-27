@@ -106,6 +106,8 @@ def run_tts(args):
 
     logging.info(f"Audio saved at: {save_path}")
 
+    return f"{timestamp}.wav"
+
 
 if __name__ == "__main__":
     logging.basicConfig(
@@ -113,4 +115,7 @@ if __name__ == "__main__":
     )
 
     args = parse_args()
-    run_tts(args)
+    file_name = run_tts(args)
+
+    with open("last_file.txt", 'w') as file:
+        file.write(file_name)

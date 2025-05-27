@@ -10,5 +10,5 @@ RUN apt-get update && apt-get upgrade -y && apt-get clean
 RUN pip install --no-cache-dir -r requirements${cuda_version}.txt
 
 COPY . .
-RUN chmod +x ./example/docker_run.sh
-CMD [ "./example/docker_run.sh" ]
+RUN chmod +x ./docker_run.sh
+CMD [ "./docker_run.sh" ]
