@@ -9,6 +9,3 @@ venv.bak/
 
 #Volume
 shared/*
-
-#Models
-pretrained_models/*
