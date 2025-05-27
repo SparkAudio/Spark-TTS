@@ -41,11 +41,6 @@ def test1():
     logging.info(f"The maximum error amounted to {max_error}")
 
     return max_error
-            
 
-if __name__ == '__main__':
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-    )
-
+def test_all():
     test1()
