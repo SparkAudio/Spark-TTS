@@ -10,12 +10,12 @@ def test1():
     
     logging.info("Generate file")
     subprocess.run(["python", "-m", "cli.inference",
-                    "--text", "身临其境，换新体验。塑造开源语音合成新范式，让智能语音更自然。",
-                    "--prompt_text", "吃燕窝就选燕之屋，本节目由26年专注高品质燕窝的燕之屋冠名播出。豆奶牛奶换着喝，营养更均衡，本节目由豆本豆豆奶特约播出。",
+                    "--text", "Where does sound end and silence begin? Perhaps that is where the most important thoughts are born. Listen carefully - each word carries more than just meaning. This is just the beginning of a story you don't know yet.",
+                    "--prompt_text", "Ladies and gentlemen, I am delighted to reet members and guests of the general assembly of the international exhibitions bureau. Russia has a long and rich experience of participation in the world expo movement.",
                     "--device", "0",
                     "--save_dir", work_dir,
                     "--model_dir", "pretrained_models/Spark-TTS-0.5B",
-                    "--prompt_speech_path", f"{app_dir}/example/prompt_audio.wav"])
+                    "--prompt_speech_path", f"{work_dir}/prompt_audio.wav"])
     
     with open("last_file.txt", 'r') as file:
         save_path = os.path.join(work_dir, file.read())
