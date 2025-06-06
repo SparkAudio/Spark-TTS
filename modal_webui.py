@@ -39,6 +39,7 @@ if not webui_script_local_path.exists():
 
 @app.function(gpu="A100")
 @modal.web_server(7860)
+@modal.concurrent(max_inputs=10) # Added this line
 def run(model_dir="pretrained_models/Spark-TTS-0.5B", device: int = 0):
     """Start the Gradio UI inside a Modal container."""
 
