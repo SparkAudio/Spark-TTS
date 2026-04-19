@@ -107,12 +107,18 @@ def build_ui(model_dir, device=0):
         prompt_speech = prompt_wav_upload if prompt_wav_upload else prompt_wav_record
         prompt_text_clean = None if len(prompt_text) < 2 else prompt_text
 
-        audio_output_path = run_tts(
-            text,
-            model,
-            prompt_text=prompt_text_clean,
-            prompt_speech=prompt_speech
-        )
+        try:
+            audio_output_path = run_tts(
+                text,
+                model,
+                prompt_text=prompt_text_clean,
+                prompt_speech=prompt_speech
+            )
+        except RuntimeError as e:
+            raise gr.Error(
+                f"Generation failed: {e} "
+                f"Try using a shorter prompt audio (2-5 seconds) or longer input text."
+            )
         return audio_output_path
 
     # Define callback function for creating new voices
@@ -125,13 +131,18 @@ def build_ui(model_dir, device=0):
         """
         pitch_val = LEVELS_MAP_UI[int(pitch)]
         speed_val = LEVELS_MAP_UI[int(speed)]
-        audio_output_path = run_tts(
-            text,
-            model,
-            gender=gender,
-            pitch=pitch_val,
-            speed=speed_val
-        )
+        try:
+            audio_output_path = run_tts(
+                text,
+                model,
+                gender=gender,
+                pitch=pitch_val,
+                speed=speed_val
+            )
+        except RuntimeError as e:
+            raise gr.Error(
+                f"Generation failed: {e} Try using longer input text."
+            )
         return audio_output_path
 
     with gr.Blocks() as demo:

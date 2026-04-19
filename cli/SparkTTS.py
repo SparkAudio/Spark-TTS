@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import re
+import logging
 import torch
 from typing import Tuple
 from pathlib import Path
@@ -166,6 +167,7 @@ class SparkTTS:
         temperature: float = 0.8,
         top_k: float = 50,
         top_p: float = 0.95,
+        max_retries: int = 3,
     ) -> torch.Tensor:
         """
         Performs inference to generate speech from text, incorporating prompt audio and/or text.
@@ -180,9 +182,14 @@ class SparkTTS:
             temperature (float, optional): Sampling temperature for controlling randomness. Default is 0.8.
             top_k (float, optional): Top-k sampling parameter. Default is 50.
             top_p (float, optional): Top-p (nucleus) sampling parameter. Default is 0.95.
+            max_retries (int, optional): Maximum number of retry attempts when the model
+                generates no semantic tokens. Default is 3.
 
         Returns:
             torch.Tensor: Generated waveform as a tensor.
+
+        Raises:
+            RuntimeError: If the model fails to generate semantic tokens after all retries.
         """
         if gender is not None:
             prompt = self.process_prompt_control(gender, pitch, speed, text)
@@ -193,28 +200,52 @@ class SparkTTS:
             )
         model_inputs = self.tokenizer([prompt], return_tensors="pt").to(self.device)
 
-        # Generate speech using the model
-        generated_ids = self.model.generate(
-            **model_inputs,
-            max_new_tokens=3000,
-            do_sample=True,
-            top_k=top_k,
-            top_p=top_p,
-            temperature=temperature,
-        )
+        # Retry loop: LLM sampling may occasionally produce no semantic tokens,
+        # which would cause a Conv1d crash on zero-length input downstream.
+        # Retrying with the same stochastic parameters usually succeeds.
+        for attempt in range(1, max_retries + 1):
+            # Generate speech using the model
+            generated_ids = self.model.generate(
+                **model_inputs,
+                max_new_tokens=3000,
+                do_sample=True,
+                top_k=top_k,
+                top_p=top_p,
+                temperature=temperature,
+            )
 
-        # Trim the output tokens to remove the input tokens
-        generated_ids = [
-            output_ids[len(input_ids) :]
-            for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
-        ]
+            # Trim the output tokens to remove the input tokens
+            generated_ids = [
+                output_ids[len(input_ids) :]
+                for input_ids, output_ids in zip(model_inputs.input_ids, generated_ids)
+            ]
 
-        # Decode the generated tokens into text
-        predicts = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
+            # Decode the generated tokens into text
+            predicts = self.tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
 
-        # Extract semantic token IDs from the generated text
+            # Extract semantic token IDs from the generated text
+            semantic_matches = re.findall(r"bicodec_semantic_(\d+)", predicts)
+
+            if len(semantic_matches) > 0:
+                break
+
+            logging.warning(
+                "Attempt %d/%d: model generated no semantic tokens. %s",
+                attempt,
+                max_retries,
+                "Retrying..." if attempt < max_retries else "Giving up.",
+            )
+
+        if len(semantic_matches) == 0:
+            raise RuntimeError(
+                f"Model failed to generate any semantic tokens after {max_retries} "
+                f"attempts. This can happen when the prompt audio is too long or the "
+                f"input text is too short. Try using a shorter prompt audio (2-5 "
+                f"seconds) or longer input text."
+            )
+
         pred_semantic_ids = (
-            torch.tensor([int(token) for token in re.findall(r"bicodec_semantic_(\d+)", predicts)])
+            torch.tensor([int(token) for token in semantic_matches])
             .long()
             .unsqueeze(0)
         )
