@@ -152,7 +152,24 @@ class FactorizedVectorQuantize(nn.Module):
         return indices
 
     def detokenize(self, indices):
-        """detokenize the input indices"""
+        """detokenize the input indices
+
+        Args:
+            indices: Token indices. shape: (batch_size, seq_len)
+
+        Returns:
+            Tensor of shape (batch_size, input_dim, seq_len)
+
+        Raises:
+            ValueError: If indices has zero-length sequence dimension,
+                which would cause Conv1d to fail on zero-length input.
+        """
+        if indices.numel() == 0:
+            raise ValueError(
+                "Cannot detokenize empty token sequence. The model generated "
+                "no semantic tokens. This typically happens when the prompt "
+                "audio is too long or the input text is too short."
+            )
         z_q = self.decode_code(indices)
         z_q = self.out_project(z_q)
         return z_q
