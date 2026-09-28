@@ -50,6 +50,7 @@ def audio_volume_normalize(audio: np.ndarray, coeff: float = 0.2) -> np.ndarray:
             temp[-1], 1e-3
         )  # Prevent division by zero with a small constant
         audio = audio / scaling_factor * 0.1
+        temp = temp / scaling_factor * 0.1
 
     # Filter out values less than 0.01 from temp
     temp = temp[temp > 0.01]
